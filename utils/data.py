@@ -3,19 +3,13 @@ import numpy as np
 from torchvision import transforms
 from PIL import Image
 import torch
+import glob
 
 
 class dataload_withlabel(torch.utils.data.Dataset):
-    def __init__(self, root, dataset="train"):
-        root = root + "/" + dataset
-       
-        imgs = os.listdir(root)
-
-        self.dataset = dataset
-        
-        self.imgs = [os.path.join(root, k) for k in imgs]
-        self.imglabel = [list(map(int,k[:-4].split("_")[1:]))  for k in imgs]
-        #print(self.imglabel)
+    def __init__(self, root):
+        self.imgs = glob.glob(root+'/*.png')
+        self.imglabel = [list(map(int,imgpath.split('/')[-1].split('.')[0].split("_")[1:]))  for imgpath in self.imgs]
         self.transforms = transforms.Compose([transforms.ToTensor()])
 
     def __getitem__(self, idx):
@@ -40,9 +34,9 @@ class dataload_withlabel(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.imgs)
 
-def c_dataset(dataset_dir, batch_size, dataset="train"):
+def c_dataset(dataset_dir, batch_size, shuffle:bool):
   
-	dataset = dataload_withlabel(dataset_dir, dataset)
-	dataset = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
+	dataset = dataload_withlabel(dataset_dir)
+	loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-	return dataset
+	return loader

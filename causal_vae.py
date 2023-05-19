@@ -8,8 +8,8 @@
 
 import torch
 import numpy as np
-from codebase import utils as ut
-from codebase.models import nns
+from utils import log_bernoulli_with_logits, condition_prior, conditional_sample_gaussian, kl_normal, sample_gaussian
+from utils import Encoder_share, Decoder_DAG, DagLayer, Attention, MaskLayer
 from torch import nn
 from torch.nn import functional as F
 device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
@@ -25,17 +25,13 @@ class CausalVAE(nn.Module):
         self.z2_dim = z2_dim
         self.channel = 4
         self.scale = np.array([[0,44],[100,40],[6.5, 3.5],[10,5]])
-        # Small note: unfortunate name clash with torch.nn
-        # nn here refers to the specific architecture file found in
-        # codebase/models/nns/*.py
-        nn = getattr(nns, nn)
-        self.enc = nn.Encoder(self.z_dim, self.channel)
-        self.dec = nn.Decoder_DAG(self.z_dim,self.z1_dim, self.z2_dim)
-        self.dag = nn.DagLayer(self.z1_dim, self.z1_dim, i = inference)
+        self.enc = Encoder_share(self.z_dim, self.channel)
+        self.dec = Decoder_DAG(self.z_dim,self.z1_dim, self.z2_dim)
+        self.dag = DagLayer(self.z1_dim, self.z1_dim, i = inference)
         #self.cause = nn.CausalLayer(self.z_dim, self.z1_dim, self.z2_dim)
-        self.attn = nn.Attention(self.z1_dim)
-        self.mask_z = nn.MaskLayer(self.z_dim)
-        self.mask_u = nn.MaskLayer(self.z1_dim,z1_dim=1)
+        self.attn = Attention(self.z1_dim)
+        self.mask_z = MaskLayer(self.z_dim)
+        self.mask_u = MaskLayer(self.z1_dim,z1_dim=1)
 
         # Set prior as fixed parameter attached to Module
         self.z_prior_m = torch.nn.Parameter(torch.zeros(1), requires_grad=False)
@@ -85,28 +81,28 @@ class CausalVAE(nn.Module):
               f_z1[:, mask, :] = z_mask[:, mask, :]
               m_zv[:, mask, :] = z_mask[:, mask, :]
           g_u = self.mask_u.mix(m_u).to(device)
-          z_given_dag = ut.conditional_sample_gaussian(f_z1, m_zv*lambdav)
+          z_given_dag = conditional_sample_gaussian(f_z1, m_zv*lambdav)
         
         decoded_bernoulli_logits,x1,x2,x3,x4 = self.dec.decode_sep(z_given_dag.reshape([z_given_dag.size()[0], self.z_dim]), label.to(device))
         
-        rec = ut.log_bernoulli_with_logits(x, decoded_bernoulli_logits.reshape(x.size()))
+        rec = log_bernoulli_with_logits(x, decoded_bernoulli_logits.reshape(x.size()))
         rec = -torch.mean(rec)
 
         p_m, p_v = torch.zeros(q_m.size()), torch.ones(q_m.size())
-        cp_m, cp_v = ut.condition_prior(self.scale, label, self.z2_dim)
+        cp_m, cp_v = condition_prior(self.scale, label, self.z2_dim)
         cp_v = torch.ones([q_m.size()[0],self.z1_dim,self.z2_dim]).to(device)
-        cp_z = ut.conditional_sample_gaussian(cp_m.to(device), cp_v.to(device))
+        cp_z = conditional_sample_gaussian(cp_m.to(device), cp_v.to(device))
         kl = torch.zeros(1).to(device)
-        kl = alpha*ut.kl_normal(q_m.view(-1,self.z_dim).to(device), q_v.view(-1,self.z_dim).to(device), p_m.view(-1,self.z_dim).to(device), p_v.view(-1,self.z_dim).to(device))
+        kl = alpha*kl_normal(q_m.view(-1,self.z_dim).to(device), q_v.view(-1,self.z_dim).to(device), p_m.view(-1,self.z_dim).to(device), p_v.view(-1,self.z_dim).to(device))
         
         for i in range(self.z1_dim):
-            kl = kl + beta*ut.kl_normal(decode_m[:,i,:].to(device), cp_v[:,i,:].to(device),cp_m[:,i,:].to(device), cp_v[:,i,:].to(device))
+            kl = kl + beta*kl_normal(decode_m[:,i,:].to(device), cp_v[:,i,:].to(device),cp_m[:,i,:].to(device), cp_v[:,i,:].to(device))
         kl = torch.mean(kl)
         mask_kl = torch.zeros(1).to(device)
         mask_kl2 = torch.zeros(1).to(device)
 
         for i in range(4):
-            mask_kl = mask_kl + 1*ut.kl_normal(f_z1[:,i,:].to(device), cp_v[:,i,:].to(device),cp_m[:,i,:].to(device), cp_v[:,i,:].to(device))
+            mask_kl = mask_kl + 1*kl_normal(f_z1[:,i,:].to(device), cp_v[:,i,:].to(device),cp_m[:,i,:].to(device), cp_v[:,i,:].to(device))
         
         
         u_loss = torch.nn.MSELoss()
@@ -137,7 +133,7 @@ class CausalVAE(nn.Module):
         return torch.sigmoid(logits)
 
     def sample_z(self, batch):
-        return ut.sample_gaussian(
+        return sample_gaussian(
             self.z_prior[0].expand(batch, self.z_dim),
             self.z_prior[1].expand(batch, self.z_dim))
 

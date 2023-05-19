@@ -1,5 +1,22 @@
 import os
 import torch
+from torch import nn
+from torch.nn import functional as F
+
+
+
+device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
+bce = torch.nn.BCEWithLogitsLoss(reduction='none')
+bce3 =  torch.nn.BCELoss(reduction='none')
+
+def _matrix_poly(matrix, d):
+    x = torch.eye(d).to(device)+ torch.div(matrix.to(device), d).to(device)
+    return torch.matrix_power(x, d)
+
+def h_A(A, m):
+    expm_A = _matrix_poly(A*A, m)
+    h_A = torch.trace(expm_A) - m
+    return h_A
 
 class DeterministicWarmup(object):
 	"""
@@ -81,3 +98,96 @@ def kl_divergence(mu, logvar):
     mean_kld = klds.mean(1).mean(0, True)
 
     return total_kld, dimension_wise_kld, mean_kld
+
+
+def gaussian_parameters(h, dim=-1):
+	"""
+	Converts generic real-valued representations into mean and variance
+	parameters of a Gaussian distribution
+
+	Args:
+		h: tensor: (batch, ..., dim, ...): Arbitrary tensor
+		dim: int: (): Dimension along which to split the tensor for mean and
+			variance
+
+	Returns:z
+		m: tensor: (batch, ..., dim / 2, ...): Mean
+		v: tensor: (batch, ..., dim / 2, ...): Variance
+	"""
+	m, h = torch.split(h, h.size(dim) // 2, dim=dim)
+	v = F.softplus(h) + 1e-8
+	return m, v
+
+def log_bernoulli_with_logits(x, logits):
+	"""
+	Computes the log probability of a Bernoulli given its logits
+
+	Args:
+		x: tensor: (batch, dim): Observation
+		logits: tensor: (batch, dim): Bernoulli logits
+
+	Return:
+		log_prob: tensor: (batch,): log probability of each sample
+	"""
+	log_prob = -bce(input=logits, target=x).sum(-1)
+	return log_prob
+
+def condition_prior(scale, label, dim):
+	mean = torch.ones(label.size()[0],label.size()[1], dim)
+	var = torch.ones(label.size()[0],label.size()[1], dim)
+	for i in range(label.size()[0]):
+		for j in range(label.size()[1]):
+			mul = (float(label[i][j])-scale[j][0])/(scale[j][1]-0)
+			mean[i][j] = torch.ones(dim)*mul
+			var[i][j] = torch.ones(dim)*1
+	return mean, var
+
+def conditional_sample_gaussian(m,v):
+	#64*3*4
+	sample = torch.randn(m.size()).to(device)
+	z = m + (v**0.5)*sample
+	return z
+
+def kl_normal(qm, qv, pm, pv):
+	"""
+	Computes the elem-wise KL divergence between two normal distributions KL(q || p) and
+	sum over the last dimension
+
+	Args:
+		qm: tensor: (batch, dim): q mean
+		qv: tensor: (batch, dim): q variance
+		pm: tensor: (batch, dim): p mean
+		pv: tensor: (batch, dim): p variance
+
+	Return:
+		kl: tensor: (batch,): kl between each sample
+	"""
+	element_wise = 0.5 * (torch.log(pv) - torch.log(qv) + qv / pv + (qm - pm).pow(2) / pv - 1)
+	kl = element_wise.sum(-1)
+	#print("log var1", qv)
+	return kl
+
+def sample_gaussian(m, v):
+	"""
+	Element-wise application reparameterization trick to sample from Gaussian
+
+	Args:
+		m: tensor: (batch, ...): Mean
+		v: tensor: (batch, ...): Variance
+
+	Return:
+		z: tensor: (batch, ...): Samples
+	"""
+	################################################################################
+	# TODO: Modify/complete the code here
+	# Sample z
+	################################################################################
+
+	################################################################################
+	# End of code modification
+	################################################################################
+	sample = torch.randn(m.shape).to(device)
+	
+
+	z = m + (v**0.5)*sample
+	return z
