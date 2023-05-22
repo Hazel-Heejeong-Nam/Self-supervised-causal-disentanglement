@@ -23,7 +23,7 @@ def cuda(tensor):
     
     
 def save_DAG(A, name):
-    A = np.array(A.cpu())
+    A = np.array(A.detach().cpu())
     fig, ax = plt.subplots()
     ax.matshow(A)
     

@@ -33,6 +33,7 @@ def main_worker(args):
         total_loss = 0
         total_rec = 0
         total_kl = 0
+        total_h_a=0
         h_a = 0
 
         for idx, (img, gt ) in enumerate(train_loader):
@@ -49,36 +50,53 @@ def main_worker(args):
             total_loss += loss.item()
             total_kl += kl.item() 
             total_rec += rec.item() 
-
+            total_h_a += h_a.item()
 
             m = len(train_loader)
-            save_image(img[0], 'figs_vae/reconstructed_image_true_{}.png'.format(epoch), normalize = True) 
-            save_image(finalrecon[0], 'figs_vae/reconstructed_image_{}.png'.format(epoch), normalize = True) 
             
         if epoch % args.iter_show == 0:
-            print(str(epoch)+' loss:'+str(total_loss/m)+' kl:'+str(total_kl/m)+' rec:'+str(total_rec/m))
+            print(str(epoch)+' loss:'+str(total_loss/m)+' kl:'+str(total_kl/m)+' rec:'+str(total_rec/m)+' DAGness:'+str(total_h_a/m))
 
         if epoch % args.iter_save == 0:
+            save_image(img[0], 'figs_vae/reconstructed_image_true_{}.png'.format(epoch), normalize = True) 
+            save_image(finalrecon[0], 'figs_vae/reconstructed_image_{}.png'.format(epoch), normalize = True) 
+            save_DAG(model.dag.A, f'A_epoch{epoch}')
             save_model_by_name(model, epoch)
 
     model.eval()
-    save_DAG(model.dag.A)
+    save_DAG(model.dag.A, f'A_final')
+    if not os.path.exists('./figs_test_vae_pendulum/'): 
+        os.makedirs('./figs_test_vae_pendulum/')
+        
     
+    count = 0
+    sample = False
+        
     for idx, (img, gt) in enumerate(test_loader):
         img = img.to(args.device) # bs x 4 x 96 x 96
-        with torch.no_grad():
-            loss, kl, rec, finalrecon, _, label_recon, label = model(img)
-        #mic = subprocess.call('mictools')
-        #tic = subprocess.call('mictools')
+        for i in range(4):
+            for j in range(-5,5):
+                with torch.no_grad():
+                    loss, kl, rec, finalrecon, _, label_recon, label = model(img,mask=i, sample=sample, adj=j*0)
+            save_image(finalrecon[0], 'figs_test_vae_pendulum/reconstructed_image_{}_{}.png'.format(i, count),  range = (0,1)) 
+        save_image(img[0], './figs_test_vae_pendulum/true_{}.png'.format(count)) 
+        count += 1
+        if count == 10:
+            break
+                #mic = subprocess.call('mictools')
+                #tic = subprocess.call('mictools')
+
+    
+    
         
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     
     # data
     parser.add_argument('--data_path', type=str, default='/mnt/hazel/data/causal_data/pendulum')
-    parser.add_argument('--epoch', type=int, default=6)
+    parser.add_argument('--epoch', type=int, default=15)
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--iter_save',   type=int, default=5, help="Save model every n epochs")
+    parser.add_argument('--iter_save',   type=int, default=3, help="Save model every n epochs")
     parser.add_argument('--iter_show',   type=int, default=1, help="show loss every n epochs")
     parser.add_argument('--beta1', default=0.9, type=float, help='Adam optimizer beta1')
     parser.add_argument('--beta2', default=0.999, type=float, help='Adam optimizer beta2')
