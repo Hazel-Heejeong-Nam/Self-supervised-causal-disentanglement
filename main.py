@@ -3,8 +3,7 @@ import argparse
 import torch
 from utils import save_model_by_name, h_A, DeterministicWarmup, c_dataset, reconstruction_loss, kl_divergence
 import os
-from causal_vae import CausalVAE
-from label_gen import label_beta
+from model import tuningfork_vae
 import argparse
 from torchvision.utils import save_image
 import random
@@ -16,8 +15,7 @@ def main_worker(args):
     torch.autograd.set_detect_anomaly(True)
     model_name = 'put_sth_proper'
     args.device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
-    c_model = CausalVAE(name=model_name, z_dim=args.z_dim, z1_dim=args.concept, z2_dim=args.z2_dim).to(args.device)
-    pre_model = label_beta(args.z_dim, args.concept, args.z2_dim).to(args.device)
+    model = tuningfork_vae().to(args.device)
     if not os.path.exists('./figs_vae/'): 
         os.makedirs('./figs_vae/')
 
@@ -25,24 +23,21 @@ def main_worker(args):
     train_loader = c_dataset(os.path.join(args.data_path, 'train'), args.batch_size, shuffle=True)
     test_loader = c_dataset(os.path.join(args.data_path, 'test'), 1, shuffle=False)
 
-    lg_optimizer = torch.optim.Adam(pre_model.parameters(), lr=args.lg_lr, betas=(args.beta1, args.beta2))
-    cl_optimizer = torch.optim.Adam(c_model.parameters(), lr=args.lg_lr, betas=(args.beta1, args.beta2))
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lg_lr, betas=(args.beta1, args.beta2))
     beta = DeterministicWarmup(n=100, t_max=1) # Linear warm-up from 0 to 1 over 50 epoch
 
 
-    if args.pretrain_path != None:
-        try:
-            pre_model_state = torch.load(args.pretrain_path)
-            missing_keys, unexpected_keys = pre_model.load_state_dict(pre_model_state, strict=False)
-            assert missing_keys == [] and unexpected_keys == [] 
-        except :
-            print('Cannot load state dict from the given path. Start new pretraining.')
-            pre_model = pretrain_labelgen(args, pre_model, train_loader, lg_optimizer)
-    else :
-        pre_model = pretrain_labelgen(args, pre_model, train_loader, lg_optimizer)            
+    # if args.pretrain_path != None:
+    #     try:
+    #         pre_model_state = torch.load(args.pretrain_path)
+    #         missing_keys, unexpected_keys = pre_model.load_state_dict(pre_model_state, strict=False)
+    #         assert missing_keys == [] and unexpected_keys == [] 
+    #     except :
+    #         print('Cannot load state dict from the given path. Start new pretraining.')
+    #         pre_model = pretrain_labelgen(args, model, train_loader, optimizer)
+    # else :
+    #     pre_model = pretrain_labelgen(args, model, train_loader, optimizer)            
 
-    
-    
     for epoch in range(args.epoch):
 
         total_loss = 0
@@ -52,52 +47,35 @@ def main_worker(args):
 
         for idx, (img, gt ) in enumerate(train_loader):
             img = img.to(args.device) # bs x 4 x 96 x 96
-            cl_optimizer.zero_grad()
-            lg_optimizer.zero_grad()
-            
+            optimizer.zero_grad()
+
             # 1. label inference
-            lg_recon, label, labelvar  = pre_model(img)
+            loss, kl, rec, finalrecon, _, label_recon, label = model(img)
 
-            # 2. update label gen
-            lg_recon_loss = reconstruction_loss(img, lg_recon, args.decoder_dist)
-            total_kld, _, _ = kl_divergence(label, labelvar)
-            # no additional loss since pretraining
-
-            lg_loss = lg_recon_loss + args.beta*total_kld + h_a*args.dag_weight
-            lg_loss.backward(retain_graph=True)
-            lg_optimizer.step()
             
-            # 3. share enc params (lg -> cl)
-            lg_enc_param = copy.deepcopy(pre_model.encoder_share.net.parameters)
-            c_model.enc.net.parameters = lg_enc_param
-            
-            # 4. causal learning
-            cl_loss, kl, rec, reconstructed_image,_ = c_model(img,label,sample = False)
-            
-            dag_param = c_model.dag.A # 4 x 4
+            dag_param = model.dag.A # 4 x 4
             h_a = h_A(dag_param, dag_param.size()[0])
             
             # 5. update causal model
-            cl_loss = cl_loss + 3*h_a + 0.5*h_a*h_a 
-            cl_loss.backward(retain_graph=True)
-            cl_optimizer.step()
-            total_loss += cl_loss.item()
+            loss = loss + 3*h_a + 0.5*h_a*h_a 
+            loss.backward()
+            optimizer.step()
+            
+            
+            total_loss += loss.item()
             total_kl += kl.item() 
             total_rec += rec.item() 
 
-            # 6. share enc params (cl -> lg)
-            cl_enc_param = copy.deepcopy(c_model.enc.net.parameters)
-            pre_model.encoder_share.net.parameters = cl_enc_param
 
             m = len(train_loader)
-            save_image(u[0], 'figs_vae/reconstructed_image_true_{}.png'.format(epoch), normalize = True) 
-            save_image(reconstructed_image[0], 'figs_vae/reconstructed_image_{}.png'.format(epoch), normalize = True) 
+            save_image(img[0], 'figs_vae/reconstructed_image_true_{}.png'.format(epoch), normalize = True) 
+            save_image(finalrecon[0], 'figs_vae/reconstructed_image_{}.png'.format(epoch), normalize = True) 
             
         if epoch % 1 == 0:
             print(str(epoch)+' loss:'+str(total_loss/m)+' kl:'+str(total_kl/m)+' rec:'+str(total_rec/m)+'m:' + str(m))
 
         if epoch % args.iter_save == 0:
-            save_model_by_name(c_model, epoch)
+            save_model_by_name(model, epoch)
 
 
 

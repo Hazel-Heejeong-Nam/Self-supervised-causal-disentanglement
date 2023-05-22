@@ -9,14 +9,15 @@
 import torch
 import numpy as np
 from utils import log_bernoulli_with_logits, condition_prior, conditional_sample_gaussian, kl_normal, sample_gaussian
-from utils import Encoder_share, Decoder_DAG, DagLayer, Attention, MaskLayer
+from utils import Encoder_share, Decoder_DAG, DagLayer, Attention, MaskLayer, Encoder_label
 from torch import nn
 from torch.nn import functional as F
 device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
+from torch.autograd import Variable
 
 
 
-class CausalVAE(nn.Module):
+class tuningfork_vae(nn.Module):
     def __init__(self, nn='mask', name='vae', z_dim=16, z1_dim=4, z2_dim=4, inference = False, alpha=0.3, beta=1):
         super().__init__()
         self.name = name
@@ -25,9 +26,11 @@ class CausalVAE(nn.Module):
         self.z2_dim = z2_dim
         self.channel = 4
         self.scale = np.array([[0,44],[100,40],[6.5, 3.5],[10,5]])
-        self.enc = Encoder_share(self.z_dim, self.channel)
-        self.dec = Decoder_DAG(self.z_dim,self.z1_dim, self.z2_dim)
+        self.enc_share = Encoder_share(self.z_dim, self.channel)
+        self.dec = Decoder_DAG(z_dim = self.z_dim, concept = self.z1_dim, z2_dim = self.z2_dim, channel = self.channel, y_dim=0)
         self.dag = DagLayer(self.z1_dim, self.z1_dim, i = inference)
+        self.enc_label = Encoder_label(z_dim= self.z_dim, concept=self.z1_dim)
+
         #self.cause = nn.CausalLayer(self.z_dim, self.z1_dim, self.z2_dim)
         self.attn = Attention(self.z1_dim)
         self.mask_z = MaskLayer(self.z_dim)
@@ -70,8 +73,13 @@ class CausalVAE(nn.Module):
 
     def sample_x_given(self, z):
         return torch.bernoulli(self.compute_sigmoid_given(z))
+    
+    def reparametrize(self,mu, logvar):
+        std = logvar.div(2).exp()
+        eps = Variable(std.data.new(std.size()).normal_())
+        return mu + std*eps
 
-    def forward(self, x, label, mask = None, sample = False, adj = None, alpha=0.3, beta=1, lambdav=0.001):
+    def forward(self, x, mask = None, sample = False, adj = None, alpha=0.3, beta=1, lambdav=0.001):
         """
         Computes the Evidence Lower Bound, KL and, Reconstruction costs
 
@@ -81,13 +89,18 @@ class CausalVAE(nn.Module):
         Returns:
             nelbo: tensor: (): Negative evidence lower bound
             kl: tensor: (): ELBO KL divergence to prior
-            rec: tensor: (): ELBO Reconstruction term
+            rec: tensor: (): ELBO Reconstruction terms
         """
-        assert label.size()[1] == self.z1_dim
-
-        q_m, q_v = self.enc(x)
+        # label gen
+        q_m, q_v = self.enc_share(x)
+        label, labelvar = self.enc_label(q_m)
+        label_latent = self.reparametrize(label, labelvar) # bs x concept
+        label_recon_img = self.dec.decode_label(label_latent)
+        labelrec = log_bernoulli_with_logits(x, label_recon_img.reshape(x.size()))
+        labelrec = -torch.mean(labelrec)
+    
+        
         q_m, q_v = q_m.reshape([q_m.size()[0], self.z1_dim,self.z2_dim]),torch.ones(q_m.size()[0], self.z1_dim,self.z2_dim).to(device)
-
         decode_m, decode_v = self.dag.calculate_dag(q_m.to(device), torch.ones(q_m.size()[0], self.z1_dim,self.z2_dim).to(device))
         decode_m, decode_v = decode_m.reshape([q_m.size()[0], self.z1_dim,self.z2_dim]),decode_v
         if sample == False:
@@ -140,7 +153,10 @@ class CausalVAE(nn.Module):
         
         u_loss = torch.nn.MSELoss()
         mask_l = torch.mean(mask_kl) + u_loss(g_u, label.float().to(device))
-        nelbo = rec + kl + mask_l
+        
+        
+        
+        loss = rec + kl + mask_l + labelrec
 
-        return nelbo, kl, rec, decoded_bernoulli_logits.reshape(x.size()), z_given_dag
+        return loss, kl, rec, decoded_bernoulli_logits.reshape(x.size()), z_given_dag, labelrec, label
 
