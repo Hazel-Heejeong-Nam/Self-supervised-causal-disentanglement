@@ -14,7 +14,7 @@ from torch import autograd, nn, optim
 from torch import nn
 from torch.nn import functional as F
 from torch.nn import Linear
-device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -22,7 +22,7 @@ from torch import autograd, nn, optim
 from torch import nn
 from torch.nn import functional as F
 from torch.nn import Linear
-device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
 
 
 
@@ -102,8 +102,9 @@ class DagLayer(nn.Linear):
         self.in_features = in_features
         self.out_features = out_features
         self.i = i
-        self.a = torch.zeros(out_features,out_features)
-        self.a = self.a
+        self.a = torch.ones(out_features,out_features)
+        self.aa = torch.eye(out_features)
+        self.a = self.a - self.aa
         #self.a[0][1], self.a[0][2], self.a[0][3] = 1,1,1
         #self.a[1][2], self.a[1][3] = 1,1
         self.A = nn.Parameter(self.a)
@@ -173,9 +174,9 @@ class Encoder_label(nn.Module):
         self.concept = concept
         self.net = nn.Sequential(
 			nn.Linear(self.z_dim, self.z_dim),
-			nn.ELU(),
+			nn.ELU(inplace=False),
 			nn.Linear(self.z_dim, self.z_dim),
-			nn.ELU(),
+			nn.ELU(inplace=False),
 			nn.Linear(self.z_dim, 2 * concept),
 		)
     def forward(self,x):
@@ -192,9 +193,9 @@ class Encoder_share(nn.Module):
 
 		self.net = nn.Sequential(
 			nn.Linear(self.channel*96*96, 900),
-			nn.ELU(),
+			nn.ELU(inplace=False),
 			nn.Linear(900, 300),
-			nn.ELU(),
+			nn.ELU(inplace=False),
 			nn.Linear(300, 2 * z_dim),
 		)
 
@@ -204,7 +205,6 @@ class Encoder_share(nn.Module):
 		xy = xy.view(-1, self.channel*96*96)
 		h = self.net(xy) # bs x zdim*2
 		m, v = gaussian_parameters(h, dim=1)
-		print(self.z_dim,m.size(),v.size())
 		return m, v
    
    
@@ -261,13 +261,13 @@ class Decoder_DAG(nn.Module):
    
 		self.net6 = nn.Sequential(
 			nn.Linear(self.concept, 300),
-			nn.ELU(),
+			nn.ELU(inplace=False),
 			nn.Linear(300, 300),
-			nn.ELU(),
+			nn.ELU(inplace=False),
 			nn.Linear(300, 1024),
-			nn.ELU(),
+			nn.ELU(inplace=False),
 			nn.Linear(1024, 1024),
-			nn.ELU(),
+			nn.ELU(inplace=False),
 			nn.Linear(1024, self.channel*96*96)
 		)
 

@@ -9,9 +9,11 @@ import argparse
 from torchvision.utils import save_image
 import random
 from pretrain import pretrain_labelgen
+import copy
     
 
 def main_worker(args):
+    torch.autograd.set_detect_anomaly(True)
     model_name = 'put_sth_proper'
     args.device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
     c_model = CausalVAE(name=model_name, z_dim=args.z_dim, z1_dim=args.concept, z2_dim=args.z2_dim).to(args.device)
@@ -50,9 +52,10 @@ def main_worker(args):
 
         for idx, (img, gt ) in enumerate(train_loader):
             img = img.to(args.device) # bs x 4 x 96 x 96
+            cl_optimizer.zero_grad()
+            lg_optimizer.zero_grad()
             
             # 1. label inference
-            lg_optimizer.zero_grad()
             lg_recon, label, labelvar  = pre_model(img)
 
             # 2. update label gen
@@ -61,31 +64,30 @@ def main_worker(args):
             # no additional loss since pretraining
 
             lg_loss = lg_recon_loss + args.beta*total_kld + h_a*args.dag_weight
-            lg_loss.backward()
+            lg_loss.backward(retain_graph=True)
             lg_optimizer.step()
             
             # 3. share enc params (lg -> cl)
-            lg_enc_param = pre_model.encoder_share.net
-            c_model.enc.net = lg_enc_param
+            lg_enc_param = copy.deepcopy(pre_model.encoder_share.net.parameters)
+            c_model.enc.net.parameters = lg_enc_param
             
             # 4. causal learning
-            cl_optimizer.zero_grad()
-            cl_loss, kl, rec, reconstructed_image,_ = c_model.negative_elbo_bound(img,label,sample = False)
+            cl_loss, kl, rec, reconstructed_image,_ = c_model(img,label,sample = False)
             
-            dag_param = c_model.dag.A
+            dag_param = c_model.dag.A # 4 x 4
             h_a = h_A(dag_param, dag_param.size()[0])
             
             # 5. update causal model
             cl_loss = cl_loss + 3*h_a + 0.5*h_a*h_a 
-            cl_loss.backward()
+            cl_loss.backward(retain_graph=True)
             cl_optimizer.step()
             total_loss += cl_loss.item()
             total_kl += kl.item() 
             total_rec += rec.item() 
 
             # 6. share enc params (cl -> lg)
-            cl_enc_param = c_model.enc.net
-            pre_model.encoder_share.net = cl_enc_param
+            cl_enc_param = copy.deepcopy(c_model.enc.net.parameters)
+            pre_model.encoder_share.net.parameters = cl_enc_param
 
             m = len(train_loader)
             save_image(u[0], 'figs_vae/reconstructed_image_true_{}.png'.format(epoch), normalize = True) 

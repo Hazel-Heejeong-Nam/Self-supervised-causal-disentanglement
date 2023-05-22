@@ -12,7 +12,7 @@ from utils import log_bernoulli_with_logits, condition_prior, conditional_sample
 from utils import Encoder_share, Decoder_DAG, DagLayer, Attention, MaskLayer
 from torch import nn
 from torch.nn import functional as F
-device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
 
 
 
@@ -38,7 +38,40 @@ class CausalVAE(nn.Module):
         self.z_prior_v = torch.nn.Parameter(torch.ones(1), requires_grad=False)
         self.z_prior = (self.z_prior_m, self.z_prior_v)
 
-    def negative_elbo_bound(self, x, label, mask = None, sample = False, adj = None, alpha=0.3, beta=1, lambdav=0.001):
+    def loss(self, x):
+        nelbo, kl, rec = self.negative_elbo_bound(x)
+        loss = nelbo
+
+        summaries = dict((
+            ('train/loss', nelbo),
+            ('gen/elbo', -nelbo),
+            ('gen/kl_z', kl),
+            ('gen/rec', rec),
+        ))
+
+        return loss, summaries
+
+    def sample_sigmoid(self, batch):
+        z = self.sample_z(batch)
+        return self.compute_sigmoid_given(z)
+
+    def compute_sigmoid_given(self, z):
+        logits = self.dec.decode(z)
+        return torch.sigmoid(logits)
+
+    def sample_z(self, batch):
+        return sample_gaussian(
+            self.z_prior[0].expand(batch, self.z_dim),
+            self.z_prior[1].expand(batch, self.z_dim))
+
+    def sample_x(self, batch):
+        z = self.sample_z(batch)
+        return self.sample_x_given(z)
+
+    def sample_x_given(self, z):
+        return torch.bernoulli(self.compute_sigmoid_given(z))
+
+    def forward(self, x, label, mask = None, sample = False, adj = None, alpha=0.3, beta=1, lambdav=0.001):
         """
         Computes the Evidence Lower Bound, KL and, Reconstruction costs
 
@@ -52,7 +85,7 @@ class CausalVAE(nn.Module):
         """
         assert label.size()[1] == self.z1_dim
 
-        q_m, q_v = self.enc.encode(x.to(device))
+        q_m, q_v = self.enc(x)
         q_m, q_v = q_m.reshape([q_m.size()[0], self.z1_dim,self.z2_dim]),torch.ones(q_m.size()[0], self.z1_dim,self.z2_dim).to(device)
 
         decode_m, decode_v = self.dag.calculate_dag(q_m.to(device), torch.ones(q_m.size()[0], self.z1_dim,self.z2_dim).to(device))
@@ -111,35 +144,3 @@ class CausalVAE(nn.Module):
 
         return nelbo, kl, rec, decoded_bernoulli_logits.reshape(x.size()), z_given_dag
 
-    def loss(self, x):
-        nelbo, kl, rec = self.negative_elbo_bound(x)
-        loss = nelbo
-
-        summaries = dict((
-            ('train/loss', nelbo),
-            ('gen/elbo', -nelbo),
-            ('gen/kl_z', kl),
-            ('gen/rec', rec),
-        ))
-
-        return loss, summaries
-
-    def sample_sigmoid(self, batch):
-        z = self.sample_z(batch)
-        return self.compute_sigmoid_given(z)
-
-    def compute_sigmoid_given(self, z):
-        logits = self.dec.decode(z)
-        return torch.sigmoid(logits)
-
-    def sample_z(self, batch):
-        return sample_gaussian(
-            self.z_prior[0].expand(batch, self.z_dim),
-            self.z_prior[1].expand(batch, self.z_dim))
-
-    def sample_x(self, batch):
-        z = self.sample_z(batch)
-        return self.sample_x_given(z)
-
-    def sample_x_given(self, z):
-        return torch.bernoulli(self.compute_sigmoid_given(z))
