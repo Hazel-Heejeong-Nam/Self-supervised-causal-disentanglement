@@ -94,6 +94,8 @@ class tuningfork_vae(nn.Module):
         # label gen
         q_m, q_v = self.enc_share(x)
         label, labelvar = self.enc_label(q_m)
+        
+        
         label_latent = self.reparametrize(label, labelvar) # bs x concept
         label_recon_img = self.dec.decode_label(label_latent)
         labelrec = log_bernoulli_with_logits(x, label_recon_img.reshape(x.size()))

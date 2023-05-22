@@ -2,12 +2,15 @@ import os
 import torch
 from torch import nn
 from torch.nn import functional as F
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 
 device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
 bce = torch.nn.BCEWithLogitsLoss(reduction='none')
 bce3 =  torch.nn.BCELoss(reduction='none')
+
 
 def _matrix_poly(matrix, d):
     x = torch.eye(d).to(device)+ torch.div(matrix.to(device), d).to(device)
@@ -37,11 +40,11 @@ class DeterministicWarmup(object):
 		self.t = self.t_max if t > self.t_max else t
 		return self.t
 
-def save_model_by_name(model, global_step):
+def save_model_by_name(model, epoch):
 	save_dir = os.path.join('checkpoints', model.name)
 	if not os.path.exists(save_dir):
 		os.makedirs(save_dir)
-	file_path = os.path.join(save_dir, 'model-{:05d}.pt'.format(global_step))
+	file_path = os.path.join(save_dir, 'model-{:04d}.pt'.format(epoch))
 	state = model.state_dict()
 	torch.save(state, file_path)
 	print('Saved to {}'.format(file_path))
