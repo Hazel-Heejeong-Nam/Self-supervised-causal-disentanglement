@@ -8,6 +8,7 @@ import os
 from torchvision.utils import save_image
 import random
 
+device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
 
 def grid2gif(image_str, output_gif, delay=100):
     """Make GIF from images.
@@ -24,70 +25,83 @@ def cuda(tensor):
     
 def save_DAG(A, name):
     A = np.array(A.detach().cpu())
-    fig, ax = plt.subplots()
-    ax.matshow(A)
-    
+    Around = np.round(A)
+    fig, ax = plt.subplots(nrows=1, ncols=2)
+    ax[0].matshow(A)
+    ax[1].matshow(Around)
+    #fig.colorbar(A)
     for (i,j) , z in np.ndenumerate(A):
-        ax.text(j,i, '{:0.3f}'.format(z), ha = 'center', va='center')
+        ax[0].text(j,i, '{:0.3f}'.format(z), ha = 'center', va='center')
     plt.savefig(f'{name}.png')
     
     
 # label에 sigmoid 해서 normalize 해둠
-def vis_disentangle(args, model, limit=1, inter=0.2, loc=-1):
+def label_traverse(args, epoch, model, loader, lowlimit=0, uplimit=1, inter=0.1, loc=-1):
     model.eval()
 
-    interpolation = torch.arange(-limit, limit+0.1, inter)
+    interpolation = torch.arange(lowlimit, uplimit+0.1, inter)
 
-    n_dsets = len(self.data_loader.dataset)
+    n_dsets = len(loader)
     rand_idx = random.randint(1, n_dsets-1)
-
-    random_img = self.data_loader.dataset.__getitem__(rand_idx)
-    random_img = Variable(cuda(random_img), volatile=True).unsqueeze(0)
-    random_img_z = encoder(random_img)[0]
-
-    random_z = Variable(cuda(torch.rand(1, self.z_dim)), volatile=True)
-
     fixed_idx = 0
-    fixed_img = self.data_loader.dataset.__getitem__(fixed_idx)
-    fixed_img = Variable(cuda(fixed_img), volatile=True).unsqueeze(0)
-    fixed_img_z =encoder(fixed_img)[0]
+    
+    random_img,_ = loader.dataset.__getitem__(rand_idx)
+    fixed_img,_ = loader.dataset.__getitem__(fixed_idx)
 
-    Z = {'fixed_img':fixed_img_z, 'random_img':random_img_z, 'random_z':random_z}
-
+    Z = {'fixed_img':fixed_img, 'random_img':random_img}
+            
     gifs = []
     for key in Z.keys():
-        z_ori = Z[key]
+        img = Z[key].to(device)
+        with torch.no_grad():
+            q_m, q_v = model.enc_share(img)
+            labelmu, labelvar = model.enc_label(q_m)
+            z_ori = F.sigmoid(model.reparametrize(labelmu, labelvar)) # bs x concept
         samples = []
-
-        for row in range(args.z_dim):
-            if loc != -1 and row != loc:
-                continue
-            z = z_ori.clone()
+        for row in range(args.concept):
+            z = z_ori.clone() # z_dim
             for val in interpolation:
                 # 여기다 여기
                 z[:, row] = val
-                sample = F.sigmoid(decoder.decode(z)).data
+                sample = F.sigmoid(model.dec.decode_label(z).reshape(img.size()))
                 samples.append(sample)
                 gifs.append(sample)
 
                     
         samples = torch.cat(samples, dim=0).cpu()
-        title = '{}_latent_traversal(iter:{})'.format(key, epoch)
+        title = 'latent_traversal(iter:{})'.format(epoch)
 
 
-    output_dir = os.path.join(args.output_dir,epoch)
-    os.makedirs(output_dir, exist_ok=True)
+    output_dir = os.path.join(args.output_dir,f'epoch{epoch}')
+    os.makedirs(output_dir, exist_ok=True)    
     outlen = args.z_dim//args.z2_dim
     gifs = torch.cat(gifs)
-    gifs = gifs.view(len(Z), outlen, len(interpolation),4, 96, 96).transpose(1, 2)
+    gifs = gifs.reshape(2, outlen, len(interpolation),4, 96, 96).transpose(1, 2)
+    
+    
+    
     for i, key in enumerate(Z.keys()):
+        os.makedirs(output_dir+'/imgs', exist_ok=True)
         for j, val in enumerate(interpolation):
-            save_image(tensor=gifs[i][j].cpu(),
-                        fp=os.path.join(output_dir, '{}_{}.jpg'.format(key, j)),
-                        nrow=outlen, pad_value=1)
+            save_image(tensor=gifs[i][j].cpu(), fp=os.path.join(output_dir, 'imgs', '{}_{}.png'.format(key, j)), nrow=outlen, pad_value=1)
 
-        grid2gif(os.path.join(output_dir, key+'*.jpg'),
-                    os.path.join(output_dir, key+'.gif'), delay=10)
-        #subprocess.call(['rm',os.path.join(output_dir,'*.jpg')])
-
+        grid2gif(os.path.join(output_dir, 'imgs', key+'*.png'), os.path.join(output_dir, key+'.gif'), delay=10)
+        subprocess.call(['rm','-rf', os.path.join(output_dir,'imgs')])
+        
+        
     model.train()
+    
+def save_imgsets(imgset, name):
+    true = imgset[0].detach().cpu().permute(1,2,0)
+    fin = imgset[1].detach().cpu().permute(1,2,0)
+    label = imgset[2].detach().cpu().permute(1,2,0)
+    
+    fig, ax = plt.subplots(ncols=3, nrows=1)
+    ax[0].imshow(true)
+    ax[0].set_title('True image')
+    ax[1].imshow(fin)
+    ax[1].set_title('Final reconstructed image')
+    ax[2].imshow(label)
+    ax[2].set_title('reconstructed image from label')
+
+    plt.savefig(name)

@@ -181,8 +181,8 @@ class Encoder_label(nn.Module):
 		)
     def forward(self,x):
         out = self.net(x) # bs x concept*2
-        label, labelvar = gaussian_parameters(out, dim=1)
-        return F.sigmoid(label), labelvar
+        labelmu, labelvar = gaussian_parameters(out, dim=1)
+        return labelmu, labelvar
 
 class Encoder_share(nn.Module):
 	def __init__(self, z_dim, channel=4, y_dim=4):

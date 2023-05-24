@@ -130,3 +130,6 @@ dmypy.json
 
 # User custom
 *.txt
+*.png
+*.gif
+*.pt

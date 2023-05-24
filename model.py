@@ -8,7 +8,7 @@
 
 import torch
 import numpy as np
-from utils import log_bernoulli_with_logits, condition_prior, conditional_sample_gaussian, kl_normal, sample_gaussian
+from utils import log_bernoulli_with_logits, condition_prior, conditional_sample_gaussian, kl_normal, sample_gaussian, kl_divergence
 from utils import Encoder_share, Decoder_DAG, DagLayer, Attention, MaskLayer, Encoder_label
 from torch import nn
 from torch.nn import functional as F
@@ -18,7 +18,7 @@ from torch.autograd import Variable
 
 
 class tuningfork_vae(nn.Module):
-    def __init__(self, nn='mask', name='vae', z_dim=16, z1_dim=4, z2_dim=4, inference = False, alpha=0.3, beta=1):
+    def __init__(self, nn='mask', name='vae', z_dim=16, z1_dim=4, z2_dim=4, inference = False, alpha=0.3):
         super().__init__()
         self.name = name
         self.z_dim = z_dim
@@ -41,18 +41,6 @@ class tuningfork_vae(nn.Module):
         self.z_prior_v = torch.nn.Parameter(torch.ones(1), requires_grad=False)
         self.z_prior = (self.z_prior_m, self.z_prior_v)
 
-    def loss(self, x):
-        nelbo, kl, rec = self.negative_elbo_bound(x)
-        loss = nelbo
-
-        summaries = dict((
-            ('train/loss', nelbo),
-            ('gen/elbo', -nelbo),
-            ('gen/kl_z', kl),
-            ('gen/rec', rec),
-        ))
-
-        return loss, summaries
 
     def sample_sigmoid(self, batch):
         z = self.sample_z(batch)
@@ -79,7 +67,7 @@ class tuningfork_vae(nn.Module):
         eps = Variable(std.data.new(std.size()).normal_())
         return mu + std*eps
 
-    def forward(self, x, mask = None, sample = False, adj = None, alpha=0.3, beta=1, lambdav=0.001):
+    def forward(self, x, gt, mask = None, sample = False, adj = None, alpha=0.3, beta=1, info='selfsup', lambdav=0.001):
         """
         Computes the Evidence Lower Bound, KL and, Reconstruction costs
 
@@ -91,16 +79,19 @@ class tuningfork_vae(nn.Module):
             kl: tensor: (): ELBO KL divergence to prior
             rec: tensor: (): ELBO Reconstruction terms
         """
-        # label gen
+
         q_m, q_v = self.enc_share(x)
-        label, labelvar = self.enc_label(q_m)
         
-        
-        label_latent = self.reparametrize(label, labelvar) # bs x concept
-        label_recon_img = self.dec.decode_label(label_latent)
-        labelrec = log_bernoulli_with_logits(x, label_recon_img.reshape(x.size()))
-        labelrec = -torch.mean(labelrec)
-    
+        if info =='selfsup':
+            labelmu, labelvar = self.enc_label(q_m)
+            label_total_kld, dim_wise_kld, mean_kld = kl_divergence(labelmu, labelvar)
+            
+            label = F.sigmoid(self.reparametrize(labelmu, labelvar)) # bs x concept
+            label_recon_img = self.dec.decode_label(label).reshape(x.size())
+            labelrec_loss = log_bernoulli_with_logits(x, label_recon_img.reshape(x.size()))
+            labelrec_loss = -torch.mean(labelrec_loss)
+        else : 
+            label = gt
         
         q_m, q_v = q_m.reshape([q_m.size()[0], self.z1_dim,self.z2_dim]),torch.ones(q_m.size()[0], self.z1_dim,self.z2_dim).to(device)
         decode_m, decode_v = self.dag.calculate_dag(q_m.to(device), torch.ones(q_m.size()[0], self.z1_dim,self.z2_dim).to(device))
@@ -133,8 +124,8 @@ class tuningfork_vae(nn.Module):
         
         decoded_bernoulli_logits,x1,x2,x3,x4 = self.dec.decode_sep(z_given_dag.reshape([z_given_dag.size()[0], self.z_dim]), label.to(device))
         
-        rec = log_bernoulli_with_logits(x, decoded_bernoulli_logits.reshape(x.size()))
-        rec = -torch.mean(rec)
+        finrec_loss = log_bernoulli_with_logits(x, decoded_bernoulli_logits.reshape(x.size()))
+        finrec_loss = -torch.mean(finrec_loss)
 
         p_m, p_v = torch.zeros(q_m.size()), torch.ones(q_m.size())
         cp_m, cp_v = condition_prior(self.scale, label, self.z2_dim)
@@ -156,9 +147,6 @@ class tuningfork_vae(nn.Module):
         u_loss = torch.nn.MSELoss()
         mask_l = torch.mean(mask_kl) + u_loss(g_u, label.float().to(device))
         
-        
-        
-        loss = rec + kl + mask_l + labelrec
-
-        return loss, kl, rec, decoded_bernoulli_logits.reshape(x.size()), z_given_dag, labelrec, label
+        final_recon = decoded_bernoulli_logits.reshape(x.size())
+        return kl, finrec_loss, mask_l, labelrec_loss, label, label_total_kld, final_recon, label_recon_img
 
