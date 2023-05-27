@@ -36,7 +36,7 @@ def save_DAG(A, name):
     
     
 # label에 sigmoid 해서 normalize 해둠
-def label_traverse(args, epoch, model, loader, lowlimit=0, uplimit=1, inter=0.1, loc=-1):
+def label_traverse(args, epoch, model, loader, lowlimit=-3, uplimit=3, inter=2/3, loc=-1):
     model.eval()
 
     interpolation = torch.arange(lowlimit, uplimit+0.1, inter)
@@ -56,7 +56,7 @@ def label_traverse(args, epoch, model, loader, lowlimit=0, uplimit=1, inter=0.1,
         with torch.no_grad():
             q_m, q_v = model.enc_share(img)
             labelmu, labelvar = model.enc_label(q_m)
-            z_ori = F.sigmoid(model.reparametrize(labelmu, labelvar)) # bs x concept
+            z_ori = model.reparametrize(labelmu, labelvar) # bs x concept
         samples = []
         for row in range(args.concept):
             z = z_ori.clone() # z_dim
@@ -64,17 +64,16 @@ def label_traverse(args, epoch, model, loader, lowlimit=0, uplimit=1, inter=0.1,
                 # 여기다 여기
                 z[:, row] = val
                 sample = F.sigmoid(model.dec.decode_label(z).reshape(img.size()))
-                samples.append(sample)
+                #sample = model.dec.decode_label(z).reshape(img.size())
                 gifs.append(sample)
 
                     
-        samples = torch.cat(samples, dim=0).cpu()
         title = 'latent_traversal(iter:{})'.format(epoch)
 
 
     output_dir = os.path.join(args.output_dir,f'epoch{epoch}')
     os.makedirs(output_dir, exist_ok=True)    
-    outlen = args.z_dim//args.z2_dim
+    outlen = args.z_dim//args.z2_dim #4
     gifs = torch.cat(gifs)
     gifs = gifs.reshape(2, outlen, len(interpolation),4, 96, 96).transpose(1, 2)
     

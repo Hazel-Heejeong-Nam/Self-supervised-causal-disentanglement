@@ -115,7 +115,7 @@ def parse_args():
     parser.add_argument('--epoch', type=int, default=150)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--iter_save',   type=int, default=10, help="Save model every n epochs")
-    parser.add_argument('--iter_show',   type=int, default=5, help="show loss every n epochs")
+    parser.add_argument('--iter_show',   type=int, default=10, help="show loss every n epochs")
     parser.add_argument('--beta1', default=0.9, type=float, help='Adam optimizer beta1')
     parser.add_argument('--beta2', default=0.999, type=float, help='Adam optimizer beta2')
     parser.add_argument('--output_dir',default='/mnt/hazel/codes/scvae_integrate/results', type=str, help='path to save results')
@@ -126,7 +126,7 @@ def parse_args():
     parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
 
     # need tuning
-    parser.add_argument('--labelbeta', default=4, type=float, help='beta parameter for KL-term in original beta-VAE') #### key
+    parser.add_argument('--labelbeta', default=10, type=float, help='beta parameter for KL-term in original beta-VAE') #### key
     parser.add_argument('--beta', default=4, type=float, help='beta parameter for KL-term in original beta-VAE') #### key
     parser.add_argument('--dag_w1', default=6, type=float)
     parser.add_argument('--dag_w2', default=1, type=float)

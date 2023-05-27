@@ -86,7 +86,7 @@ class tuningfork_vae(nn.Module):
             labelmu, labelvar = self.enc_label(q_m)
             label_total_kld, dim_wise_kld, mean_kld = kl_divergence(labelmu, labelvar)
             
-            label = F.sigmoid(self.reparametrize(labelmu, labelvar)) # bs x concept
+            label = self.reparametrize(labelmu, labelvar) # bs x concept
             label_recon_img = self.dec.decode_label(label).reshape(x.size())
             labelrec_loss = log_bernoulli_with_logits(x, label_recon_img.reshape(x.size()))
             labelrec_loss = -torch.mean(labelrec_loss)
