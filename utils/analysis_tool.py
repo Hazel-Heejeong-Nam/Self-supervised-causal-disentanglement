@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 import torch
 from torch.autograd import Variable
 import subprocess
@@ -7,6 +8,7 @@ import torch.nn.functional as F
 import os
 from torchvision.utils import save_image
 import random
+matplotlib.use('Agg') 
 
 device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
 
@@ -36,7 +38,7 @@ def save_DAG(A, name):
     
     
 # label에 sigmoid 해서 normalize 해둠
-def label_traverse(args, epoch, model, loader, lowlimit=-3, uplimit=3, inter=2/3, loc=-1):
+def label_traverse(args, epoch, model, model_name, loader, lowlimit=-3, uplimit=3, inter=2/3, loc=-1):
     model.eval()
 
     interpolation = torch.arange(lowlimit, uplimit+0.1, inter)
@@ -71,7 +73,7 @@ def label_traverse(args, epoch, model, loader, lowlimit=-3, uplimit=3, inter=2/3
         title = 'latent_traversal(iter:{})'.format(epoch)
 
 
-    output_dir = os.path.join(args.output_dir,f'epoch{epoch}')
+    output_dir = os.path.join(args.output_dir,model_name,f'epoch{epoch}')
     os.makedirs(output_dir, exist_ok=True)    
     outlen = args.z_dim//args.z2_dim #4
     gifs = torch.cat(gifs)

@@ -92,6 +92,9 @@ class tuningfork_vae(nn.Module):
             labelrec_loss = -torch.mean(labelrec_loss)
         else : 
             label = gt
+            labelrec_loss=0
+            label_recon_img=0
+            label_total_kld=0
         
         q_m, q_v = q_m.reshape([q_m.size()[0], self.z1_dim,self.z2_dim]),torch.ones(q_m.size()[0], self.z1_dim,self.z2_dim).to(device)
         decode_m, decode_v = self.dag.calculate_dag(q_m.to(device), torch.ones(q_m.size()[0], self.z1_dim,self.z2_dim).to(device))

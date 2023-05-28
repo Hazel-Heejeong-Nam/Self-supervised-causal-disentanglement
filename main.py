@@ -14,7 +14,7 @@ import mictools
 
 def main_worker(args):
     torch.autograd.set_detect_anomaly(True)
-    model_name = 'put_sth_proper'
+    model_name = f'{args.sup}_ecg_z{args.z_dim}_c{args.concept}_lr_{args.lr}_labelbeta_{args.labelbeta}_dagweights_{args.dag_w1}_{args.dag_w2}'
     args.device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
     model = tuningfork_vae(name=model_name, z_dim=args.z_dim, z1_dim=args.concept, z2_dim=args.z2_dim).to(args.device)
     
@@ -71,12 +71,12 @@ def main_worker(args):
         if epoch % args.iter_save == 0:
             
             if not os.path.exists(os.path.join(args.output_dir,f'epoch{epoch}')): 
-                os.makedirs(os.path.join(args.output_dir,f'epoch{epoch}'))
+                os.makedirs(os.path.join(args.output_dir,model_name, f'epoch{epoch}'))
                 
-            save_imgsets([img[0], final_recon[0], label_recon_img[0]], os.path.join(args.output_dir, f'epoch{epoch}',f'reconstructed_imgs_epoch{epoch}.png'))
-            save_DAG(model.dag.A, os.path.join(args.output_dir,f'epoch{epoch}',f'A_epoch{epoch}'))
+            save_imgsets([img[0], final_recon[0], label_recon_img[0]], os.path.join(args.output_dir,model_name, f'epoch{epoch}',f'reconstructed_imgs_epoch{epoch}.png'))
+            save_DAG(model.dag.A, os.path.join(args.output_dir,model_name,f'epoch{epoch}',f'A_epoch{epoch}'))
             save_model_by_name(model, epoch)
-            label_traverse(args, epoch, model, test_loader)
+            label_traverse(args, epoch, model,model_name, test_loader)
             # label traverse 저장
 
     model.eval()
@@ -138,7 +138,7 @@ def parse_args():
     # unsup : causalVAE w/o label
     # selfsup : mine
     # weaksup : causalVAE
-    parser.add_argument('--sup', default='selfsup', choices=['unsup', 'selfsup', 'weaksup']) # currently unsup unavailable
+    parser.add_argument('--sup', default='unsup', choices=['unsup', 'selfsup', 'weaksup']) # currently unsup unavailable
     
 
 
