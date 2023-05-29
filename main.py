@@ -29,36 +29,58 @@ def main_worker(args):
     beta = DeterministicWarmup(n=100, t_max=1) # Linear warm-up from 0 to 1 over 50 epoch
     
 
-    for epoch in trange(args.epoch):
-
-        total_loss = 0
-        total_finkl = 0
-        total_finrec = 0
-        total_labelkl = 0
-        total_labelrec = 0
-        total_h_a=0
-        h_a = 0
+    for epoch in trange(args.pretrain_epoch):
 
         for idx, (img, gt ) in enumerate(train_loader):
             img = img.to(args.device) # bs x 4 x 96 x 96
-            optimizer.zero_grad()
 
-            fin_kl, fin_rec_loss, mask_loss, label_rec_loss, label, label_total_kld, final_recon, label_recon_img = model(img, gt, beta=args.beta, info= args.sup)
-            dag_param = model.dag.A # 4 x 4
-            h_a = h_A(dag_param, dag_param.size()[0])
+            optimizer.zero_grad()
+            label_rec_loss, label_kl_loss, label_recon_img ,label= model(img, gt, beta=args.beta, info= args.sup,stage=0)
+            loss_pre = label_rec_loss + args.labelbeta* label_kl_loss
+            loss_pre.backward()
+            optimizer.step()
+
+    
+    for epoch in trange(args.epoch):
+
+        # total_loss = 0
+        # total_finkl = 0
+        # total_finrec = 0
+        # total_labelkl = 0
+        # total_labelrec = 0
+        # total_h_a=0
+        # h_a = 0
+
+        for idx, (img, gt ) in enumerate(train_loader):
+            img = img.to(args.device) # bs x 4 x 96 x 96
             
-            loss = fin_kl + fin_rec_loss + mask_loss + label_rec_loss + args.labelbeta * label_total_kld + args.dag_w1*h_a + args.dag_w2 *h_a*h_a 
-            loss.backward()
+            #stage 0
+            optimizer.zero_grad()
+            label_rec_loss, label_kl_loss, label_recon_img ,label= model(img, gt, beta=args.beta, info= args.sup,stage=0, pretrain=True)
+            dag_param = model.dag.A # 4 x 4
+            h_a0 = h_A(dag_param, dag_param.size()[0])
+            
+            loss0 = label_rec_loss + args.labelbeta* label_kl_loss + args.dag_w1 * h_a0 + args.dag_w2 *h_a0*h_a0 
+            loss0.backward()
             optimizer.step()
             
-            total_loss += loss.item()
-            total_finkl += fin_kl.item() 
-            total_labelkl += label_total_kld.item()
+            #stage 1
+            optimizer.zero_grad()
+            c_rec_loss, c_kl_loss, c_recon_img, mask_loss = model(img, gt, beta=args.beta, info= args.sup,stage=1)
+            dag_param = model.dag.A # 4 x 4
+            h_a1 = h_A(dag_param, dag_param.size()[0])
+            loss1 = c_kl_loss + c_rec_loss + mask_loss + args.dag_w1*h_a1 + args.dag_w2 *h_a1*h_a1
+            loss1.backward()
+            optimizer.step()
             
-            total_finrec += fin_rec_loss.item() 
-            total_labelrec += label_rec_loss.item()
+            # total_loss += loss.item()
+            # total_finkl += fin_kl.item() 
+            # total_labelkl += label_total_kld.item()
             
-            total_h_a += h_a.item()
+            # total_finrec += fin_rec_loss.item() 
+            # total_labelrec += label_rec_loss.item()
+            
+            # total_h_a += h_a.item()
 
             m = len(train_loader)
         
@@ -112,6 +134,7 @@ def parse_args():
     
     # data
     parser.add_argument('--data_path', type=str, default='/mnt/hazel/data/causal_data/pendulum')
+    parser.add_argument('--pretrain_epoch', type=int, default=50)
     parser.add_argument('--epoch', type=int, default=150)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--iter_save',   type=int, default=10, help="Save model every n epochs")
@@ -138,7 +161,7 @@ def parse_args():
     # unsup : causalVAE w/o label
     # selfsup : mine
     # weaksup : causalVAE
-    parser.add_argument('--sup', default='unsup', choices=['unsup', 'selfsup', 'weaksup']) # currently unsup unavailable
+    parser.add_argument('--sup', default='selfsup', choices=['unsup', 'selfsup', 'weaksup']) # currently unsup unavailable
     
 
 

@@ -39,10 +39,10 @@ def kl_divergence(mu, logvar):
 
     klds = -0.5*(1 + logvar - mu.pow(2) - logvar.exp())
     total_kld = klds.sum(1).mean(0, True)
-    dimension_wise_kld = klds.mean(0)
-    mean_kld = klds.mean(1).mean(0, True)
+    #dimension_wise_kld = klds.mean(0)
+    #mean_kld = klds.mean(1).mean(0, True)
 
-    return total_kld, dimension_wise_kld, mean_kld
+    return total_kld
 
 def _matrix_poly(matrix, d):
     x = torch.eye(d).to(device)+ torch.div(matrix.to(device), d).to(device)

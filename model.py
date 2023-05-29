@@ -67,7 +67,7 @@ class tuningfork_vae(nn.Module):
         eps = Variable(std.data.new(std.size()).normal_())
         return mu + std*eps
 
-    def forward(self, x, gt, mask = None, sample = False, adj = None, alpha=0.3, beta=1, info='selfsup', lambdav=0.001):
+    def forward(self, x, gt, mask = None, sample = False, adj = None, alpha=0.3, beta=1, info='selfsup', stage=0, pretrain=False, lambdav=0.001):
         """
         Computes the Evidence Lower Bound, KL and, Reconstruction costs
 
@@ -84,58 +84,78 @@ class tuningfork_vae(nn.Module):
         
         if info =='selfsup':
             labelmu, labelvar = self.enc_label(q_m)
-            label_total_kld, dim_wise_kld, mean_kld = kl_divergence(labelmu, labelvar)
+            label_kld = kl_divergence(labelmu, labelvar)
             
             label = self.reparametrize(labelmu, labelvar) # bs x concept
             label_recon_img = self.dec.decode_label(label).reshape(x.size())
+            
             labelrec_loss = log_bernoulli_with_logits(x, label_recon_img.reshape(x.size()))
             labelrec_loss = -torch.mean(labelrec_loss)
         else : 
             label = gt
             labelrec_loss=0
             label_recon_img=0
-            label_total_kld=0
+            label_kld=0
+            
+        if pretrain:
+            return labelrec_loss, label_kld, label_recon_img ,label
+        
         
         q_m, q_v = q_m.reshape([q_m.size()[0], self.z1_dim,self.z2_dim]),torch.ones(q_m.size()[0], self.z1_dim,self.z2_dim).to(device)
-        decode_m, decode_v = self.dag.calculate_dag(q_m.to(device), torch.ones(q_m.size()[0], self.z1_dim,self.z2_dim).to(device))
-        decode_m, decode_v = decode_m.reshape([q_m.size()[0], self.z1_dim,self.z2_dim]),decode_v
+        
+        # GRADIENT CTRL #
+        # stage 0 : mask inference 전에 encoder output gradient 끊어버림
+        if stage == 0:
+            q_m_clone = q_m.detach()
+            q_v_clone = q_v.detach()
+            label_clone = label
+        elif stage==1 :
+            q_m_clone = q_m
+            q_v_clone = q_v
+            label_clone = label.detach()
+        else :
+            ValueError("Invalid stage encountered")
+        ###
+        
+        decode_m, decode_v = self.dag.calculate_dag(q_m_clone.to(device), torch.ones(q_m_clone.size()[0], self.z1_dim,self.z2_dim).to(device))
+        decode_m, decode_v = decode_m.reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]),decode_v
         if sample == False:
           if mask != None and mask < 2:
-              z_mask = torch.ones(q_m.size()[0], self.z1_dim,self.z2_dim).to(device)*adj
+              z_mask = torch.ones(q_m_clone.size()[0], self.z1_dim,self.z2_dim).to(device)*adj
               decode_m[:, mask, :] = z_mask[:, mask, :]
               decode_v[:, mask, :] = z_mask[:, mask, :]
-          m_zm, m_zv = self.dag.mask_z(decode_m.to(device)).reshape([q_m.size()[0], self.z1_dim,self.z2_dim]),decode_v.reshape([q_m.size()[0], self.z1_dim,self.z2_dim])
-          m_u = self.dag.mask_u(label.to(device))
+          m_zm, m_zv = self.dag.mask_z(decode_m.to(device)).reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]),decode_v.reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim])
+          m_u = self.dag.mask_u(label_clone.to(device))
           
-          f_z = self.mask_z.mix(m_zm).reshape([q_m.size()[0], self.z1_dim,self.z2_dim]).to(device)
-          e_tilde = self.attn.attention(decode_m.reshape([q_m.size()[0], self.z1_dim,self.z2_dim]).to(device),q_m.reshape([q_m.size()[0], self.z1_dim,self.z2_dim]).to(device))[0]
+          f_z = self.mask_z.mix(m_zm).reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]).to(device)
+          e_tilde = self.attn.attention(decode_m.reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]).to(device),q_m_clone.reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]).to(device))[0]
           if mask != None and mask < 2:
-              z_mask = torch.ones(q_m.size()[0],self.z1_dim,self.z2_dim).to(device)*adj
+              z_mask = torch.ones(q_m_clone.size()[0],self.z1_dim,self.z2_dim).to(device)*adj
               e_tilde[:, mask, :] = z_mask[:, mask, :]
               
           f_z1 = f_z+e_tilde
           if mask!= None and mask == 2 :
-              z_mask = torch.ones(q_m.size()[0],self.z1_dim,self.z2_dim).to(device)*adj
+              z_mask = torch.ones(q_m_clone.size()[0],self.z1_dim,self.z2_dim).to(device)*adj
               f_z1[:, mask, :] = z_mask[:, mask, :]
               m_zv[:, mask, :] = z_mask[:, mask, :]
           if mask!= None and mask == 3 :
-              z_mask = torch.ones(q_m.size()[0],self.z1_dim,self.z2_dim).to(device)*adj
+              z_mask = torch.ones(q_m_clone.size()[0],self.z1_dim,self.z2_dim).to(device)*adj
               f_z1[:, mask, :] = z_mask[:, mask, :]
               m_zv[:, mask, :] = z_mask[:, mask, :]
           g_u = self.mask_u.mix(m_u).to(device)
           z_given_dag = conditional_sample_gaussian(f_z1, m_zv*lambdav)
         
-        decoded_bernoulli_logits,x1,x2,x3,x4 = self.dec.decode_sep(z_given_dag.reshape([z_given_dag.size()[0], self.z_dim]), label.to(device))
+        decoded_bernoulli_logits,x1,x2,x3,x4 = self.dec.decode_sep(z_given_dag.reshape([z_given_dag.size()[0], self.z_dim]), label_clone.to(device))
         
         finrec_loss = log_bernoulli_with_logits(x, decoded_bernoulli_logits.reshape(x.size()))
         finrec_loss = -torch.mean(finrec_loss)
 
-        p_m, p_v = torch.zeros(q_m.size()), torch.ones(q_m.size())
-        cp_m, cp_v = condition_prior(self.scale, label, self.z2_dim)
-        cp_v = torch.ones([q_m.size()[0],self.z1_dim,self.z2_dim]).to(device)
+        p_m, p_v = torch.zeros(q_m_clone.size()), torch.ones(q_m_clone.size())
+        cp_m, cp_v = condition_prior(self.scale, label_clone, self.z2_dim)
+        cp_v = torch.ones([q_m_clone.size()[0],self.z1_dim,self.z2_dim]).to(device)
         cp_z = conditional_sample_gaussian(cp_m.to(device), cp_v.to(device))
         kl = torch.zeros(1).to(device)
-        kl = alpha*kl_normal(q_m.view(-1,self.z_dim).to(device), q_v.view(-1,self.z_dim).to(device), p_m.view(-1,self.z_dim).to(device), p_v.view(-1,self.z_dim).to(device))
+        kl = alpha*kl_normal(q_m_clone.view(-1,self.z_dim).to(device), q_v_clone.view(-1,self.z_dim).to(device), p_m.view(-1,self.z_dim).to(device), p_v.view(-1,self.z_dim).to(device))
         
         for i in range(self.z1_dim):
             kl = kl + beta*kl_normal(decode_m[:,i,:].to(device), cp_v[:,i,:].to(device),cp_m[:,i,:].to(device), cp_v[:,i,:].to(device))
@@ -148,8 +168,14 @@ class tuningfork_vae(nn.Module):
         
         
         u_loss = torch.nn.MSELoss()
-        mask_l = torch.mean(mask_kl) + u_loss(g_u, label.float().to(device))
+        mask_l = torch.mean(mask_kl) + u_loss(g_u, label_clone.float().to(device))
         
         final_recon = decoded_bernoulli_logits.reshape(x.size())
-        return kl, finrec_loss, mask_l, labelrec_loss, label, label_total_kld, final_recon, label_recon_img
+    
+        if stage==0 :
+            return labelrec_loss, label_kld, label_recon_img ,label_clone
+        
+        elif stage ==1 :
+            return finrec_loss, kl, final_recon, mask_l
+
 
