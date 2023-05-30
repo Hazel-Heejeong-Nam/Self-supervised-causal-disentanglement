@@ -88,9 +88,9 @@ class tuningfork_vae(nn.Module):
             
             label = self.reparametrize(labelmu, labelvar) # bs x concept
             label_recon_img = self.dec.decode_label(label).reshape(x.size())
-            
-            labelrec_loss = log_bernoulli_with_logits(x, label_recon_img.reshape(x.size()))
-            labelrec_loss = -torch.mean(labelrec_loss)
+            labelrec_loss = F.binary_cross_entropy_with_logits(label_recon_img.reshape(x.size()), x, size_average=False).div(x.shape[0])
+            #labelrec_loss = log_bernoulli_with_logits(x, label_recon_img.reshape(x.size()))
+            #labelrec_loss = -torch.mean(labelrec_loss)
         else : 
             label = gt
             labelrec_loss=0
@@ -125,8 +125,16 @@ class tuningfork_vae(nn.Module):
               decode_m[:, mask, :] = z_mask[:, mask, :]
               decode_v[:, mask, :] = z_mask[:, mask, :]
           m_zm, m_zv = self.dag.mask_z(decode_m.to(device)).reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]),decode_v.reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim])
-          m_u = self.dag.mask_u(label_clone.to(device))
           
+          # no label related operation if unsupervised
+          if info != 'unsup':
+            m_u = self.dag.mask_u(label_clone.to(device))
+            g_u = self.mask_u.mix(m_u).to(device)
+            u_MSE = torch.nn.MSELoss()
+            u_loss = u_MSE(g_u, label_clone.float().to(device))
+          else :
+            u_loss = 0
+            
           f_z = self.mask_z.mix(m_zm).reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]).to(device)
           e_tilde = self.attn.attention(decode_m.reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]).to(device),q_m_clone.reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]).to(device))[0]
           if mask != None and mask < 2:
@@ -142,7 +150,7 @@ class tuningfork_vae(nn.Module):
               z_mask = torch.ones(q_m_clone.size()[0],self.z1_dim,self.z2_dim).to(device)*adj
               f_z1[:, mask, :] = z_mask[:, mask, :]
               m_zv[:, mask, :] = z_mask[:, mask, :]
-          g_u = self.mask_u.mix(m_u).to(device)
+
           z_given_dag = conditional_sample_gaussian(f_z1, m_zv*lambdav)
         
         decoded_bernoulli_logits,x1,x2,x3,x4 = self.dec.decode_sep(z_given_dag.reshape([z_given_dag.size()[0], self.z_dim]), label_clone.to(device))
@@ -166,9 +174,7 @@ class tuningfork_vae(nn.Module):
         for i in range(4):
             mask_kl = mask_kl + 1*kl_normal(f_z1[:,i,:].to(device), cp_v[:,i,:].to(device),cp_m[:,i,:].to(device), cp_v[:,i,:].to(device))
         
-        
-        u_loss = torch.nn.MSELoss()
-        mask_l = torch.mean(mask_kl) + u_loss(g_u, label_clone.float().to(device))
+        mask_l = torch.mean(mask_kl) + u_loss
         
         final_recon = decoded_bernoulli_logits.reshape(x.size())
     
@@ -176,6 +182,6 @@ class tuningfork_vae(nn.Module):
             return labelrec_loss, label_kld, label_recon_img ,label_clone
         
         elif stage ==1 :
-            return finrec_loss, kl, final_recon, mask_l
+            return finrec_loss, kl, final_recon, mask_l 
 
 

@@ -38,7 +38,7 @@ def save_DAG(A, name):
     
     
 # label에 sigmoid 해서 normalize 해둠
-def label_traverse(args, epoch, model, model_name, loader, lowlimit=-3, uplimit=3, inter=2/3, loc=-1):
+def label_traverse(args, epoch, model, model_name, loader, pretrain, lowlimit=-3, uplimit=3, inter=2/3, loc=-1):
     model.eval()
 
     interpolation = torch.arange(lowlimit, uplimit+0.1, inter)
@@ -72,8 +72,11 @@ def label_traverse(args, epoch, model, model_name, loader, lowlimit=-3, uplimit=
                     
         title = 'latent_traversal(iter:{})'.format(epoch)
 
-
-    output_dir = os.path.join(args.output_dir,model_name,f'epoch{epoch}')
+    if pretrain :
+        output_dir = os.path.join(args.output_dir,model_name,f'pre_epoch{epoch}')
+    else :
+        output_dir = os.path.join(args.output_dir,model_name,f'epoch{epoch}')
+        
     os.makedirs(output_dir, exist_ok=True)    
     outlen = args.z_dim//args.z2_dim #4
     gifs = torch.cat(gifs)
@@ -92,17 +95,19 @@ def label_traverse(args, epoch, model, model_name, loader, lowlimit=-3, uplimit=
         
     model.train()
     
-def save_imgsets(imgset, name):
+def save_imgsets(imgset, save_path):
     true = imgset[0].detach().cpu().permute(1,2,0)
     fin = imgset[1].detach().cpu().permute(1,2,0)
-    label = imgset[2].detach().cpu().permute(1,2,0)
+    if len(imgset)==3 : 
+        label = imgset[2].detach().cpu().permute(1,2,0)
     
-    fig, ax = plt.subplots(ncols=3, nrows=1)
+    fig, ax = plt.subplots(ncols=len(imgset), nrows=1)
     ax[0].imshow(true)
-    ax[0].set_title('True image')
+    ax[0].set_title('True')
     ax[1].imshow(fin)
-    ax[1].set_title('Final reconstructed image')
-    ax[2].imshow(label)
-    ax[2].set_title('reconstructed image from label')
+    ax[1].set_title('Final')
+    if len(imgset)==3 : 
+        ax[2].imshow(label)
+        ax[2].set_title('label')
 
-    plt.savefig(name)
+    plt.savefig(os.path.join(save_path, 'reconsturcted.png'))
