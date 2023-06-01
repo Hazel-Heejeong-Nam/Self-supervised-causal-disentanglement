@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 def main_worker(args):
     torch.autograd.set_detect_anomaly(True)
-    model_name = f'{args.sup}_ecg_z{args.z_dim}_c{args.concept}_lr_{args.lr}_labelbeta_{args.labelbeta}_dagweights_{args.dag_w1}_{args.dag_w2}'
+    model_name = f'{args.sup}_ecg_z{args.z_dim}_c{args.concept}_lr_{args.lr}_labelbeta_{args.labelbeta}_epoch_{args.epoch}_dagweights_{args.l_dag_w1}_{args.l_dag_w2}_{args.dag_w1}_{args.dag_w2}'
     args.device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
     model = tuningfork_vae(name=model_name, z_dim=args.z_dim, z1_dim=args.concept, z2_dim=args.z2_dim).to(args.device)
     
@@ -25,8 +25,8 @@ def main_worker(args):
         os.makedirs(args.output_dir)
 
 
-    train_loader = c_dataset(os.path.join(args.data_path, 'train'), args.batch_size, shuffle=True)
-    test_loader = c_dataset(os.path.join(args.data_path, 'test'), 1, shuffle=False)
+    train_loader = c_dataset(os.path.join(args.data_path, 'train'), args.batch_size, args.num_workers, shuffle=True)
+    test_loader = c_dataset(os.path.join(args.data_path, 'test'), 1,args.num_workers, shuffle=False)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
     beta = DeterministicWarmup(n=100, t_max=1) # Linear warm-up from 0 to 1 over 50 epoch
@@ -77,7 +77,7 @@ def main_worker(args):
                 dag_param = model.dag.A # 4 x 4
                 h_a0 = h_A(dag_param, dag_param.size()[0])
                 
-                loss0 = label_rec_loss + args.labelbeta* label_kl_loss + args.dag_w1 * h_a0 + args.dag_w2 *h_a0*h_a0 
+                loss0 = label_rec_loss + args.labelbeta* label_kl_loss + args.l_dag_w1 * h_a0 + args.l_dag_w2 *h_a0*h_a0 
                 loss0.backward()
                 optimizer.step()
             else : 
@@ -124,25 +124,30 @@ def main_worker(args):
                 
     model.eval()
     save_DAG(model.dag.A, os.path.join(args.output_dir, model_name, 'A_final'))
+    save_model_by_name(model) # save final model
     # if not os.path.exists(os.path.join(args.output_dir, model_name, 'evals')): 
     #     os.makedirs(os.path.join(args.output_dir, model_name, 'evals'))
         
     sample = False
-    fig, ax = plt.subplots(ncols=10, nrows=args.concept+1)  
+    fig, ax = plt.subplots(ncols=10, nrows=args.concept+1, figsize=(40,15))  
+    plt.subplots_adjust(wspace=0, hspace=0)
     for idx, (img, gt) in enumerate(test_loader):
         img = img.to(args.device) # bs x 4 x 96 x 96
         for i in range(args.concept):
             for j in range(-5,5):
                 with torch.no_grad():
                     c_rec_loss, c_kl_loss, c_recon_img, mask_loss = model(img,gt, mask=i, sample=sample, adj=j*0, beta=args.beta, info= args.sup,stage=1)
-            #save_image(c_recon_img[0], os.path.join(args.output_dir, model_name, 'evals','reconstructed_image_{}_{}.png'.format(i, idx)),  range = (0,1)) 
-            ax[i][idx] = plt.imshow(c_recon_img[0].detach().cpu().permute(1,2,0))
-        #save_image(img[0], os.path.join(args.output_dir, model_name, 'evals','true_{}.png'.format(idx))) 
-        ax[args.concept][idx] = plt.imshow(img[0].detach().cpu().permute(1,2,0))
-        if idx == 10:
+
+            ax[i][idx].imshow(c_recon_img[0].squeeze(0).detach().cpu().permute(1,2,0))
+            ax[i][idx].get_xaxis().set_visible(False)
+            ax[i][idx].get_yaxis().set_visible(False)
+        ax[args.concept][idx].imshow(img[0].squeeze(0).detach().cpu().permute(1,2,0))
+        ax[args.concept][idx].get_xaxis().set_visible(False)
+        ax[args.concept][idx].get_yaxis().set_visible(False)
+        if idx == 9:
             break
-        
-    plt.savefig('')
+
+    plt.savefig(os.path.join(args.output_dir, model_name, 'do_operation.png'))
     #mic = subprocess.call('mictools')
     #tic = subprocess.call('mictools')
 
@@ -154,11 +159,12 @@ def parse_args():
     
     # data
     parser.add_argument('--data_path', type=str, default='/mnt/hazel/data/causal_data/pendulum')
-    parser.add_argument('--pretrain_epoch', type=int, default=30)
-    parser.add_argument('--epoch', type=int, default=100)
+    parser.add_argument('--pretrain_epoch', type=int, default=50)
+    parser.add_argument('--epoch', type=int, default=150)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--iter_show',   type=int, default=10, help="Save model every n epochs")
     parser.add_argument('--pre_iter_show',   type=int, default=10, help="Save model every n epochs")
+    parser.add_argument('--num_workers', type=int, default=4)
     
     parser.add_argument('--beta1', default=0.9, type=float, help='Adam optimizer beta1')
     parser.add_argument('--beta2', default=0.999, type=float, help='Adam optimizer beta2')
@@ -167,13 +173,15 @@ def parse_args():
     parser.add_argument('--z_dim', default=16, type=int)
     parser.add_argument('--concept', default = 4, type= int)
     parser.add_argument('--z2_dim', default=4, type =int)
-    parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
+    parser.add_argument('--lr', default=1e-4, type=float, help='learning rate')
 
     # need tuning
-    parser.add_argument('--labelbeta', default=10, type=float, help='beta parameter for KL-term in original beta-VAE') #### key
+    parser.add_argument('--labelbeta', default=20, type=float, help='beta parameter for KL-term in original beta-VAE') #### key
     parser.add_argument('--beta', default=4, type=float, help='beta parameter for KL-term in original beta-VAE') #### key
     parser.add_argument('--dag_w1', default=3, type=float)
     parser.add_argument('--dag_w2', default=0.5, type=float)
+    parser.add_argument('--l_dag_w1', default=3, type=float)
+    parser.add_argument('--l_dag_w2', default=0.5, type=float)
     
     
     parser.add_argument('--gamma', default=1000, type=float, help='gamma parameter for KL-term in understanding beta-VAE')
@@ -182,7 +190,7 @@ def parse_args():
     # unsup : causalVAE w/o label
     # selfsup : mine
     # weaksup : causalVAE
-    parser.add_argument('--sup', default='weaksup', choices=['unsup', 'selfsup', 'weaksup']) # currently unsup unavailable
+    parser.add_argument('--sup', default='selfsup', choices=['unsup', 'selfsup', 'weaksup']) # currently unsup unavailable
     
 
 

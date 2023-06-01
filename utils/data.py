@@ -34,9 +34,9 @@ class dataload_withlabel(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.imgs)
 
-def c_dataset(dataset_dir, batch_size, shuffle:bool):
+def c_dataset(dataset_dir, batch_size, num_workers, shuffle:bool):
   
 	dataset = dataload_withlabel(dataset_dir)
-	loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+	loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=shuffle)
 
 	return loader
