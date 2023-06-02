@@ -3,12 +3,10 @@
 
 Based on "Disentangling by Factorising" (https://arxiv.org/abs/1802.05983).
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from absl import logging
-import m_utils as utils
+from .m_utils import obtain_representation, gen_pendulum_factors, gen_pendulum_observation
 import numpy as np
+import torch
+device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
 
 
 def compute_factor_vae(ground_truth_data,
@@ -36,9 +34,7 @@ def compute_factor_vae(ground_truth_data,
       train_accuracy: Accuracy on training set.
       eval_accuracy: Accuracy on evaluation set.
   """
-  global_variances = _compute_variances(ground_truth_data,
-                                        representation_function,
-                                        num_variance_estimate, random_state)
+  global_variances = _compute_variances(ground_truth_data,representation_function,num_variance_estimate, random_state)
   active_dims = _prune_dims(global_variances)
   scores_dict = {}
 
@@ -48,27 +44,19 @@ def compute_factor_vae(ground_truth_data,
     scores_dict["num_active_dims"] = 0
     return scores_dict
 
-  training_votes = _generate_training_batch(ground_truth_data,
-                                            representation_function, batch_size,
-                                            num_train, random_state,
-                                            global_variances, active_dims)
+  training_votes = _generate_training_batch(ground_truth_data, representation_function, batch_size,num_train, random_state,global_variances, active_dims)
   classifier = np.argmax(training_votes, axis=0)
   other_index = np.arange(training_votes.shape[1])
 
   print("Evaluate training set accuracy.")
-  train_accuracy = np.sum(
-      training_votes[classifier, other_index]) * 1. / np.sum(training_votes)
+  train_accuracy = np.sum(training_votes[classifier, other_index]) * 1. / np.sum(training_votes)
   print("Training set accuracy: %.2g", train_accuracy)
 
   print("Generating evaluation set.")
-  eval_votes = _generate_training_batch(ground_truth_data,
-                                        representation_function, batch_size,
-                                        num_eval, random_state,
-                                        global_variances, active_dims)
+  eval_votes = _generate_training_batch(ground_truth_data,representation_function, batch_size,num_eval, random_state,global_variances, active_dims)
 
   print("Evaluate evaluation set accuracy.")
-  eval_accuracy = np.sum(eval_votes[classifier,
-                                    other_index]) * 1. / np.sum(eval_votes)
+  eval_accuracy = np.sum(eval_votes[classifier,other_index]) * 1. / np.sum(eval_votes)
   print("Evaluation set accuracy: %.2g", eval_accuracy)
   scores_dict["train_accuracy"] = train_accuracy
   scores_dict["eval_accuracy"] = eval_accuracy
@@ -81,11 +69,7 @@ def _prune_dims(variances, threshold=0.):
   return scale_z >= threshold
 
 
-def _compute_variances(ground_truth_data,
-                       representation_function,
-                       batch_size,
-                       random_state,
-                       eval_batch_size=64):
+def _compute_variances(ground_truth_data,representation_function,batch_size,random_state,eval_batch_size=64):
   """Computes the variance for each dimension of the representation.
 
   Args:
@@ -99,18 +83,15 @@ def _compute_variances(ground_truth_data,
   Returns:
     Vector with the variance of each dimension.
   """
-  observations = ground_truth_data.sample_observations(batch_size, random_state)
-  representations = utils.obtain_representation(observations,
-                                                representation_function,
-                                                eval_batch_size)
-  representations = np.transpose(representations)
+  num_factors=4
+  observations = gen_pendulum_observation(gen_pendulum_factors(random_state, batch_size))
+  representations = obtain_representation(observations,representation_function,eval_batch_size)
+  representations = np.transpose(representations) # batch_size x num_factors
   assert representations.shape[0] == batch_size
   return np.var(representations, axis=0, ddof=1)
 
 
-def _generate_training_sample(ground_truth_data, representation_function,
-                              batch_size, random_state, global_variances,
-                              active_dims):
+def _generate_training_sample(ground_truth_data, representation_function, batch_size, random_state, global_variances,active_dims):
   """Sample a single training sample based on a mini-batch of ground-truth data.
 
   Args:
@@ -127,25 +108,22 @@ def _generate_training_sample(ground_truth_data, representation_function,
     factor_index: Index of factor coordinate to be used.
     argmin: Index of representation coordinate with the least variance.
   """
+  num_factors=4
   # Select random coordinate to keep fixed.
-  factor_index = random_state.randint(ground_truth_data.num_factors)
+  factor_index = random_state.randint(num_factors)
   # Sample two mini batches of latent variables.
-  factors = ground_truth_data.sample_factors(batch_size, random_state)
+  factors =  gen_pendulum_factors(random_state, batch_size)
   # Fix the selected factor across mini-batch.
   factors[:, factor_index] = factors[0, factor_index]
   # Obtain the observations.
-  observations = ground_truth_data.sample_observations_from_factors(
-      factors, random_state)
-  representations = representation_function(observations)
+  observations = gen_pendulum_observation(factors)
+  representations = representation_function(observations.to(device)).detach().cpu().numpy()
   local_variances = np.var(representations, axis=0, ddof=1)
-  argmin = np.argmin(local_variances[active_dims] /
-                     global_variances[active_dims])
+  argmin = np.argmin(local_variances[active_dims] /global_variances[active_dims])
   return factor_index, argmin
 
 
-def _generate_training_batch(ground_truth_data, representation_function,
-                             batch_size, num_points, random_state,
-                             global_variances, active_dims):
+def _generate_training_batch(ground_truth_data, representation_function,batch_size, num_points, random_state,global_variances, active_dims):
   """Sample a set of training samples based on a batch of ground-truth data.
 
   Args:
@@ -162,14 +140,10 @@ def _generate_training_batch(ground_truth_data, representation_function,
   Returns:
     (num_factors, dim_representation)-sized numpy array with votes.
   """
-  votes = np.zeros((ground_truth_data.num_factors, global_variances.shape[0]),
-                   dtype=np.int64)
+  num_factors = 4
+  votes = np.zeros((num_factors, global_variances.shape[0]), dtype=np.int64)
   for _ in range(num_points):
-    factor_index, argmin = _generate_training_sample(ground_truth_data,
-                                                     representation_function,
-                                                     batch_size, random_state,
-                                                     global_variances,
-                                                     active_dims)
+    factor_index, argmin = _generate_training_sample(ground_truth_data,representation_function,batch_size, random_state,global_variances,active_dims)
     votes[factor_index, argmin] += 1
   return votes
 

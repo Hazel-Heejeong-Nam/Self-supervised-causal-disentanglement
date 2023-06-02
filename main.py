@@ -176,7 +176,7 @@ def parse_args():
     parser.add_argument('--lr', default=1e-4, type=float, help='learning rate')
 
     # need tuning
-    parser.add_argument('--labelbeta', default=20, type=float, help='beta parameter for KL-term in original beta-VAE') #### key
+    parser.add_argument('--labelbeta', default=20.0, type=float, help='beta parameter for KL-term in original beta-VAE') #### key
     parser.add_argument('--beta', default=4, type=float, help='beta parameter for KL-term in original beta-VAE') #### key
     parser.add_argument('--dag_w1', default=3, type=float)
     parser.add_argument('--dag_w2', default=0.5, type=float)
@@ -193,7 +193,14 @@ def parse_args():
     parser.add_argument('--sup', default='selfsup', choices=['unsup', 'selfsup', 'weaksup']) # currently unsup unavailable
     
 
-
+    # evaluate
+    parser.add_argument('--metric', type=str, default = 'factorvae',choices=['betavae','factorvae','sap'])
+    parser.add_argument('--gt_path', type=str, default='/mnt/hazel/data/causal_data/pendulum/test')
+    parser.add_argument('--model_path', type=str, default='/mnt/hazel/codes/scvae_integrate/checkpoints')
+    parser.add_argument('--model_name', type=str, default=None)
+    parser.add_argument('--num_train', type=int, default=1000)
+    parser.add_argument('--num_eval', type=int, default=500)
+    parser.add_argument('--eval_batch_size', type=int, default=5)
 
 
     args = parser.parse_args()

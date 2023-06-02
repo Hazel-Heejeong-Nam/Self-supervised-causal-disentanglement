@@ -18,14 +18,10 @@
 Based on "Variational Inference of Disentangled Latent Concepts from Unlabeled
 Observations" (https://openreview.net/forum?id=H1kG7GZAW), Section 3.
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from absl import logging
-import m_utils as utils
+
+from .m_utils import generate_batch_factor_code
 import numpy as np
 from sklearn import svm
-from absl.testing import absltest
 import numpy as np
 
 
@@ -54,8 +50,8 @@ def compute_sap(ground_truth_data,
     Dictionary with SAP score.
   """
 
-  mus, ys = utils.generate_batch_factor_code(ground_truth_data, representation_function, num_train,random_state, batch_size)
-  mus_test, ys_test = utils.generate_batch_factor_code(ground_truth_data, representation_function, num_test,random_state, batch_size)
+  mus, ys = generate_batch_factor_code(ground_truth_data, representation_function, num_train,random_state, batch_size)
+  mus_test, ys_test = generate_batch_factor_code(ground_truth_data, representation_function, num_test,random_state, batch_size)
 
   return _compute_sap(mus, ys, mus_test, ys_test, continuous_factors)
 
