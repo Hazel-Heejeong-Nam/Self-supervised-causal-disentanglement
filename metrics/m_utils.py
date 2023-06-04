@@ -199,7 +199,7 @@ def gen_pendulum_observation(factors):
     mid = img[3]
     
     
-    plt.rcParams['figure.figsize'] = (1.0, 1.0)
+    fig = plt.figure(figsize=(1.0,1.0), dpi=96)
     theta = i*math.pi/200.0
     phi = j*math.pi/200.0
     x = 10 + 8*math.sin(theta)
@@ -219,12 +219,9 @@ def gen_pendulum_observation(factors):
     ax.set_xlim((0, 20))
     ax.set_ylim((-1, 21))
     plt.axis('off')
-    plt.savefig('./temp.png', dpi=96) 
-    image = Image.open('./temp.png')
-    image = transforms.ToTensor()(image) # 4 x 96 x 96
-    imageset.append(image)
-    subprocess.call(['rm','./temp.png'])
-    
+    fig.canvas.draw()
+    imageset.append(torch.from_numpy(np.array(fig.canvas.renderer._renderer, dtype=np.float32)/255))
+  plt.close('all')
   return torch.stack(imageset, dim=0) # bs x 4 x 96 x 96
 
 

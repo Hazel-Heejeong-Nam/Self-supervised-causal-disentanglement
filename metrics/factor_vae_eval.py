@@ -7,7 +7,7 @@ from .m_utils import obtain_representation, gen_pendulum_factors, gen_pendulum_o
 import numpy as np
 import torch
 device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
-
+from tqdm import trange
 
 def compute_factor_vae(ground_truth_data,
                        representation_function,
@@ -142,7 +142,7 @@ def _generate_training_batch(ground_truth_data, representation_function,batch_si
   """
   num_factors = 4
   votes = np.zeros((num_factors, global_variances.shape[0]), dtype=np.int64)
-  for _ in range(num_points):
+  for _ in trange(num_points):
     factor_index, argmin = _generate_training_sample(ground_truth_data,representation_function,batch_size, random_state,global_variances,active_dims)
     votes[factor_index, argmin] += 1
   return votes

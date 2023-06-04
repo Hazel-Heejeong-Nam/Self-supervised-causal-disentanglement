@@ -201,9 +201,7 @@ class Encoder_share(nn.Module):
 
 
 	def forward(self, x, y=None):
-		xy = x if y is None else torch.cat((x, y), dim=1)
-		xy = xy.view(-1, self.channel*96*96)
-		h = self.net(xy) # bs x zdim*2
+		h = self.net(x.view(-1, self.channel*96*96)) # bs x zdim*2
 		m, v = gaussian_parameters(h, dim=1)
 		return m, v
    

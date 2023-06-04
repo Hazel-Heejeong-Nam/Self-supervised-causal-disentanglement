@@ -11,7 +11,7 @@ import copy
 from tqdm import trange
 import mictools
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 import matplotlib.pyplot as plt
     
 
@@ -159,8 +159,8 @@ def parse_args():
     
     # data
     parser.add_argument('--data_path', type=str, default='/mnt/hazel/data/causal_data/pendulum')
-    parser.add_argument('--pretrain_epoch', type=int, default=50)
-    parser.add_argument('--epoch', type=int, default=150)
+    parser.add_argument('--pretrain_epoch', type=int, default=30)
+    parser.add_argument('--epoch', type=int, default=170)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--iter_show',   type=int, default=10, help="Save model every n epochs")
     parser.add_argument('--pre_iter_show',   type=int, default=10, help="Save model every n epochs")
@@ -176,10 +176,10 @@ def parse_args():
     parser.add_argument('--lr', default=1e-4, type=float, help='learning rate')
 
     # need tuning
-    parser.add_argument('--labelbeta', default=20.0, type=float, help='beta parameter for KL-term in original beta-VAE') #### key
+    parser.add_argument('--labelbeta', default=20, type=float, help='beta parameter for KL-term in original beta-VAE') #### key
     parser.add_argument('--beta', default=4, type=float, help='beta parameter for KL-term in original beta-VAE') #### key
-    parser.add_argument('--dag_w1', default=3, type=float)
-    parser.add_argument('--dag_w2', default=0.5, type=float)
+    parser.add_argument('--dag_w1', default=12, type=float)
+    parser.add_argument('--dag_w2', default=2, type=float)
     parser.add_argument('--l_dag_w1', default=3, type=float)
     parser.add_argument('--l_dag_w2', default=0.5, type=float)
     

@@ -27,6 +27,7 @@ if __name__ == "__main__":
     state = torch.load(model_path)
     missing_keys, unexpected_keys = tmodel.load_state_dict(state, strict=False)
     assert missing_keys == [] and unexpected_keys == [] 
+    tmodel.eval()
     representation_function = lambda x : tmodel.reparametrize(tmodel.enc_label(tmodel.enc_share(x)[0])[0],tmodel.enc_label(tmodel.enc_share(x)[0])[1])
     
     #set random state
@@ -34,7 +35,8 @@ if __name__ == "__main__":
     if args.metric == 'betavae':
         scores = betavae(ground_truth_data, representation_function, random_state, args.eval_batch_size,args.num_train, args.num_eval)
     elif args.metric == 'factorvae':
-        scores = factorvae(ground_truth_data, representation_function, random_state, args.eval_batch_size, args.num_train, args.num_eval, 5)
+        scores = factorvae(ground_truth_data, representation_function, random_state, args.eval_batch_size, args.num_train, args.num_eval, 500)
+        #scores = factor_vae.compute_factor_vae(ground_truth_data, representation_function, random_state, 5, 3000,2000, 2500)
     elif args.metric == 'sap':
         scores = sap(ground_truth_data, representation_function, random_state, 3000,3000, continuous_factors=True)
     else :
