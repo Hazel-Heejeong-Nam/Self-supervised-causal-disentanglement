@@ -221,6 +221,7 @@ def gen_pendulum_observation(factors):
     plt.axis('off')
     fig.canvas.draw()
     imageset.append(torch.from_numpy(np.array(fig.canvas.renderer._renderer, dtype=np.float32)/255))
+    plt.close()
   plt.close('all')
   return torch.stack(imageset, dim=0) # bs x 4 x 96 x 96
 

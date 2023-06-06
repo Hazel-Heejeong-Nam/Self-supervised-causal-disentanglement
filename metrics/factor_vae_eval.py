@@ -50,14 +50,14 @@ def compute_factor_vae(ground_truth_data,
 
   print("Evaluate training set accuracy.")
   train_accuracy = np.sum(training_votes[classifier, other_index]) * 1. / np.sum(training_votes)
-  print("Training set accuracy: %.2g", train_accuracy)
+  print(f"Training set accuracy:{train_accuracy}")
 
   print("Generating evaluation set.")
   eval_votes = _generate_training_batch(ground_truth_data,representation_function, batch_size,num_eval, random_state,global_variances, active_dims)
 
   print("Evaluate evaluation set accuracy.")
   eval_accuracy = np.sum(eval_votes[classifier,other_index]) * 1. / np.sum(eval_votes)
-  print("Evaluation set accuracy: %.2g", eval_accuracy)
+  print(f"Evaluation set accuracy: {eval_accuracy}")
   scores_dict["train_accuracy"] = train_accuracy
   scores_dict["eval_accuracy"] = eval_accuracy
   scores_dict["num_active_dims"] = len(active_dims)

@@ -1,5 +1,5 @@
 import argparse 
-from metrics import betavae, factorvae, sap
+from metrics import betavae, factorvae, check_label
 import numpy as np
 from main import parse_args
 import torch
@@ -37,7 +37,9 @@ if __name__ == "__main__":
     elif args.metric == 'factorvae':
         scores = factorvae(ground_truth_data, representation_function, random_state, args.eval_batch_size, args.num_train, args.num_eval, 500)
         #scores = factor_vae.compute_factor_vae(ground_truth_data, representation_function, random_state, 5, 3000,2000, 2500)
-    elif args.metric == 'sap':
-        scores = sap(ground_truth_data, representation_function, random_state, 3000,3000, continuous_factors=True)
+    elif args.metric == 'dds':
+        pass
+    elif args.metric == 'label':
+        check_label(representation_function)
     else :
         ValueError('Undefined metric encountered')

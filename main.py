@@ -3,7 +3,7 @@ import argparse
 import torch
 from utils import save_model_by_name, h_A, DeterministicWarmup, c_dataset, reconstruction_loss, kl_divergence, save_DAG, label_traverse, save_imgsets
 import os
-from model import tuningfork_vae
+from model import tuningfork_vae, Discriminator
 import argparse
 from torchvision.utils import save_image
 import random
@@ -73,12 +73,16 @@ def main_worker(args):
             if args.sup =='selfsup':
                 #stage 0
                 optimizer.zero_grad()
+    
+                
                 label_rec_loss, label_kl_loss, label_recon_img ,label= model(img, gt, beta=args.beta, info= args.sup,stage=0, pretrain=True)
                 dag_param = model.dag.A # 4 x 4
                 h_a0 = h_A(dag_param, dag_param.size()[0])
+
                 
-                loss0 = label_rec_loss + args.labelbeta* label_kl_loss + args.l_dag_w1 * h_a0 + args.l_dag_w2 *h_a0*h_a0 
-                loss0.backward()
+                
+                loss0 = label_rec_loss + args.labelbeta* label_kl_loss +  args.l_dag_w1 * h_a0 + args.l_dag_w2 *h_a0*h_a0 
+                loss0.backward(retain_graph=True)
                 optimizer.step()
             else : 
                 loss0 = 0
@@ -92,7 +96,7 @@ def main_worker(args):
             loss1 = c_kl_loss + c_rec_loss + mask_loss + args.dag_w1*h_a1 + args.dag_w2 *h_a1*h_a1
             loss1.backward()
             optimizer.step()
-            
+
             # loss
             total_loss = total_loss +  loss0 + loss1
             total_DAG = total_DAG + (h_a0 + h_a1)/2
@@ -194,10 +198,10 @@ def parse_args():
     
 
     # evaluate
-    parser.add_argument('--metric', type=str, default = 'factorvae',choices=['betavae','factorvae','sap'])
+    parser.add_argument('--metric', type=str, default = 'label',choices=['betavae','factorvae','label'])
     parser.add_argument('--gt_path', type=str, default='/mnt/hazel/data/causal_data/pendulum/test')
     parser.add_argument('--model_path', type=str, default='/mnt/hazel/codes/scvae_integrate/checkpoints')
-    parser.add_argument('--model_name', type=str, default=None)
+    parser.add_argument('--model_name', type=str, default='selfsup_ecg_z16_c4_lr_0.0001_labelbeta_20_epoch_170_dagweights_3_0.5_3_0.5')
     parser.add_argument('--num_train', type=int, default=1000)
     parser.add_argument('--num_eval', type=int, default=500)
     parser.add_argument('--eval_batch_size', type=int, default=5)
