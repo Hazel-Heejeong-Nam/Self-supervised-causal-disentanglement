@@ -19,7 +19,7 @@ def check_label(representation_function):
         img = ToTensor()(img).to(device)
         i,j,shade,mid = imgpath.split('/')[-1].split('.')[0].split('_')[1:]
         label = representation_function(img)[0]
-        print(f'              {i}      {label[0]:.3f}     {j}      {label[1]:.3f}        {shade}    {label[2]:.3f}      {mid}      {label[3]:.3f}')
+        print(f'              {i}       {j}       {shade}      {mid}      {label[0]:.3f}    {label[1]:.3f}     {label[2]:.3f}    {label[3]:.3f}')
         
 if __name__ =='__main__':
     pass

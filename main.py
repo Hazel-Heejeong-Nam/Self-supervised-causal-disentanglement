@@ -163,8 +163,8 @@ def parse_args():
     
     # data
     parser.add_argument('--data_path', type=str, default='/mnt/hazel/data/causal_data/pendulum')
-    parser.add_argument('--pretrain_epoch', type=int, default=30)
-    parser.add_argument('--epoch', type=int, default=170)
+    parser.add_argument('--pretrain_epoch', type=int, default=10)
+    parser.add_argument('--epoch', type=int, default=240)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--iter_show',   type=int, default=10, help="Save model every n epochs")
     parser.add_argument('--pre_iter_show',   type=int, default=10, help="Save model every n epochs")
@@ -182,10 +182,10 @@ def parse_args():
     # need tuning
     parser.add_argument('--labelbeta', default=20, type=float, help='beta parameter for KL-term in original beta-VAE') #### key
     parser.add_argument('--beta', default=4, type=float, help='beta parameter for KL-term in original beta-VAE') #### key
-    parser.add_argument('--dag_w1', default=12, type=float)
-    parser.add_argument('--dag_w2', default=2, type=float)
-    parser.add_argument('--l_dag_w1', default=3, type=float)
-    parser.add_argument('--l_dag_w2', default=0.5, type=float)
+    parser.add_argument('--dag_w1', default=3, type=float)
+    parser.add_argument('--dag_w2', default=0.5, type=float)
+    parser.add_argument('--l_dag_w1', default=12, type=float)
+    parser.add_argument('--l_dag_w2', default=2, type=float)
     
     
     parser.add_argument('--gamma', default=1000, type=float, help='gamma parameter for KL-term in understanding beta-VAE')
@@ -201,7 +201,7 @@ def parse_args():
     parser.add_argument('--metric', type=str, default = 'label',choices=['betavae','factorvae','label'])
     parser.add_argument('--gt_path', type=str, default='/mnt/hazel/data/causal_data/pendulum/test')
     parser.add_argument('--model_path', type=str, default='/mnt/hazel/codes/scvae_integrate/checkpoints')
-    parser.add_argument('--model_name', type=str, default='selfsup_ecg_z16_c4_lr_0.0001_labelbeta_20_epoch_170_dagweights_3_0.5_3_0.5')
+    parser.add_argument('--model_name', type=str, default='selfsup_ecg_z16_c4_lr_0.0001_labelbeta_20.0_epoch_170_dagweights_12.0_2.0_3.0_0.5')
     parser.add_argument('--num_train', type=int, default=1000)
     parser.add_argument('--num_eval', type=int, default=500)
     parser.add_argument('--eval_batch_size', type=int, default=5)

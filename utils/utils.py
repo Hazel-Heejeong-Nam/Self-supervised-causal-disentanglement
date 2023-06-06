@@ -108,6 +108,15 @@ def condition_prior(scale, label, dim):
 			mean[i][j] = torch.ones(dim)*mul
 			var[i][j] = torch.ones(dim)*1
 	return mean, var
+# def condition_prior(scale, label, dim):
+#     	mean = torch.ones(label.size()[0],label.size()[1], dim)
+# 	var = torch.ones(label.size()[0],label.size()[1], dim)
+# 	for i in range(label.size()[0]):
+# 		for j in range(label.size()[1]):
+# 			mul = (float(label[i][j])-scale[j][0])/(scale[j][1]-0)
+# 			mean[i][j] = torch.ones(dim)*mul
+# 			var[i][j] = torch.ones(dim)*1
+# 	return mean, var
 
 def conditional_sample_gaussian(m,v):
 	#64*3*4
