@@ -17,9 +17,9 @@ import matplotlib.pyplot as plt
 
 def main_worker(args):
     torch.autograd.set_detect_anomaly(True)
-    model_name = f'{args.sup}_ecg_z{args.z_dim}_c{args.concept}_lr_{args.lr}_labelbeta_{args.labelbeta}_epoch_{args.epoch}_dagweights_{args.l_dag_w1}_{args.l_dag_w2}_{args.dag_w1}_{args.dag_w2}'
+    args.model_name = f'{args.sup}_ecg_z{args.z_dim}_c{args.concept}_lr_{args.lr}_labelbeta_{args.labelbeta}_epoch_{args.epoch}_dagweights_{args.l_dag_w1}_{args.l_dag_w2}_{args.dag_w1}_{args.dag_w2}'
     args.device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
-    model = tuningfork_vae(name=model_name, z_dim=args.z_dim, z1_dim=args.concept, z2_dim=args.z2_dim).to(args.device)
+    model = tuningfork_vae(name=args.model_name, z_dim=args.z_dim, z1_dim=args.concept, z2_dim=args.z2_dim).to(args.device)
     
     if not os.path.exists(args.output_dir): 
         os.makedirs(args.output_dir)
@@ -55,7 +55,7 @@ def main_worker(args):
                 
             if epoch % args.pre_iter_show == 0:
                 print(f'Pretrain epoch {epoch+1}    total : {pre_total/m}, kl : {pre_total_kl/m}, rec : {pre_total_rec/m}')
-                label_traverse(args, epoch, model,model_name, test_loader, pretrain=True)
+                label_traverse(args, epoch, model,args.model_name, test_loader, pretrain=True)
 
     print('\n\n--------------START TRAINING')
     for epoch in trange(args.epoch):
@@ -110,9 +110,9 @@ def main_worker(args):
 
             m = len(train_loader)
         if epoch % args.iter_show == 0:
-            save_path = os.path.join(args.output_dir,model_name,f'epoch{epoch}')
+            save_path = os.path.join(args.output_dir,args.model_name,f'epoch{epoch}')
             if not os.path.exists(save_path): 
-                os.makedirs(os.path.join(args.output_dir,model_name, f'epoch{epoch}'))
+                os.makedirs(os.path.join(args.output_dir,args.model_name, f'epoch{epoch}'))
             save_DAG(model.dag.A, os.path.join(save_path,f'A_epoch{epoch}'))
             #save_model_by_name(model, epoch)
             print(f'Epoch {epoch+1}     total loss: {total_loss.item()/m}, total DAG : {total_DAG/m}')
@@ -121,13 +121,13 @@ def main_worker(args):
             if args.sup == 'selfsup':
                 print(f'                    label recon: {total_l_rec/m}, label kl: {total_l_kl/m}')
                 save_imgsets([img[0], c_recon_img[0], label_recon_img[0]], save_path)
-                label_traverse(args, epoch, model,model_name, test_loader,pretrain=False)
+                label_traverse(args, epoch, model,args.model_name, test_loader,pretrain=False)
             else :
                 save_imgsets([img[0], c_recon_img[0]], save_path)
                 
                 
     model.eval()
-    save_DAG(model.dag.A, os.path.join(args.output_dir, model_name, 'A_final'))
+    save_DAG(model.dag.A, os.path.join(args.output_dir, args.model_name, 'A_final'))
     save_model_by_name(model) # save final model
     # if not os.path.exists(os.path.join(args.output_dir, model_name, 'evals')): 
     #     os.makedirs(os.path.join(args.output_dir, model_name, 'evals'))
@@ -151,7 +151,7 @@ def main_worker(args):
         if idx == 9:
             break
 
-    plt.savefig(os.path.join(args.output_dir, model_name, 'do_operation.png'))
+    plt.savefig(os.path.join(args.output_dir, args.model_name, 'do_operation.png'))
     #mic = subprocess.call('mictools')
     #tic = subprocess.call('mictools')
 
@@ -163,8 +163,8 @@ def parse_args():
     
     # data
     parser.add_argument('--data_path', type=str, default='/mnt/hazel/data/causal_data/pendulum')
-    parser.add_argument('--pretrain_epoch', type=int, default=10)
-    parser.add_argument('--epoch', type=int, default=240)
+    parser.add_argument('--pretrain_epoch', type=int, default=50)
+    parser.add_argument('--epoch', type=int, default=250)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--iter_show',   type=int, default=10, help="Save model every n epochs")
     parser.add_argument('--pre_iter_show',   type=int, default=10, help="Save model every n epochs")
@@ -201,7 +201,7 @@ def parse_args():
     parser.add_argument('--metric', type=str, default = 'label',choices=['betavae','factorvae','label'])
     parser.add_argument('--gt_path', type=str, default='/mnt/hazel/data/causal_data/pendulum/test')
     parser.add_argument('--model_path', type=str, default='/mnt/hazel/codes/scvae_integrate/checkpoints')
-    parser.add_argument('--model_name', type=str, default='selfsup_ecg_z16_c4_lr_0.0001_labelbeta_20.0_epoch_170_dagweights_12.0_2.0_3.0_0.5')
+    parser.add_argument('--model_name', type=str, default='selfsup_ecg_z16_c4_lr_0.0001_labelbeta_20_epoch_170_dagweights_12_2_3_0.5')
     parser.add_argument('--num_train', type=int, default=1000)
     parser.add_argument('--num_eval', type=int, default=500)
     parser.add_argument('--eval_batch_size', type=int, default=5)

@@ -1,5 +1,5 @@
 import argparse 
-from metrics import betavae, factorvae, check_label
+from metrics import betavae, factorvae, check_label, do_op
 import numpy as np
 from main import parse_args
 import torch
@@ -41,5 +41,8 @@ if __name__ == "__main__":
         pass
     elif args.metric == 'label':
         check_label(representation_function)
+        
+    elif args.metric =='do':
+        do_op(args, tmodel)
     else :
         ValueError('Undefined metric encountered')
