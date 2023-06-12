@@ -163,7 +163,7 @@ def parse_args():
     
     # data
     parser.add_argument('--data_path', type=str, default='/mnt/hazel/data/causal_data/pendulum')
-    parser.add_argument('--pretrain_epoch', type=int, default=50)
+    parser.add_argument('--pretrain_epoch', type=int, default=10)
     parser.add_argument('--epoch', type=int, default=250)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--iter_show',   type=int, default=10, help="Save model every n epochs")
@@ -185,7 +185,7 @@ def parse_args():
     parser.add_argument('--dag_w1', default=3, type=float)
     parser.add_argument('--dag_w2', default=0.5, type=float)
     parser.add_argument('--l_dag_w1', default=12, type=float)
-    parser.add_argument('--l_dag_w2', default=2, type=float)
+    parser.add_argument('--l_dag_w2', default=10, type=float)
     
     
     parser.add_argument('--gamma', default=1000, type=float, help='gamma parameter for KL-term in understanding beta-VAE')
@@ -198,10 +198,10 @@ def parse_args():
     
 
     # evaluate
-    parser.add_argument('--metric', type=str, default = 'label',choices=['betavae','factorvae','label'])
+    parser.add_argument('--metric', type=str, default = 'label',choices=['betavae','factorvae','label','do'])
     parser.add_argument('--gt_path', type=str, default='/mnt/hazel/data/causal_data/pendulum/test')
     parser.add_argument('--model_path', type=str, default='/mnt/hazel/codes/scvae_integrate/checkpoints')
-    parser.add_argument('--model_name', type=str, default='selfsup_ecg_z16_c4_lr_0.0001_labelbeta_20_epoch_170_dagweights_12_2_3_0.5')
+    parser.add_argument('--model_name', type=str, default='selfsup_ecg_z16_c4_lr_0.0001_labelbeta_20_epoch_250_dagweights_12_2_3_0.5')
     parser.add_argument('--num_train', type=int, default=1000)
     parser.add_argument('--num_eval', type=int, default=500)
     parser.add_argument('--eval_batch_size', type=int, default=5)
@@ -212,9 +212,9 @@ def parse_args():
 
 if __name__ == "__main__":
     #seed 
-    random.seed(0)
-    torch.manual_seed(0)
-    torch.cuda.manual_seed_all(0)
+    random.seed(1)
+    torch.manual_seed(1)
+    torch.cuda.manual_seed_all(1)
 
     
     #arg parsing
