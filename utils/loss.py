@@ -1,6 +1,6 @@
 import torch
 from torch.nn import functional as F
-device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
 
 def reconstruction_loss(x, x_recon, distribution):
     batch_size = x.size(0)

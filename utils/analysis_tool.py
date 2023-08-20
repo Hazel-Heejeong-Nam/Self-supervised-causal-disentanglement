@@ -10,7 +10,7 @@ from torchvision.utils import save_image
 import random
 matplotlib.use('Agg') 
 
-device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
 
 def grid2gif(image_str, output_gif, delay=100):
     """Make GIF from images.

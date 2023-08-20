@@ -2,7 +2,7 @@ import glob
 from PIL import Image
 from torchvision.transforms import ToTensor
 import torch
-device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
 
 
 

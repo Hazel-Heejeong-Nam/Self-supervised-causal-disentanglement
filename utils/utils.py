@@ -10,9 +10,22 @@ matplotlib.use('Agg')
 
 
 
-device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
 bce = torch.nn.BCEWithLogitsLoss(reduction='none')
 bce3 =  torch.nn.BCELoss(reduction='none')
+
+def permute_dims(z):
+    assert z.dim() == 2
+
+    B, _ = z.size()
+    perm_z = []
+    for z_j in z.split(1, 1):
+        perm = torch.randperm(B).to(z.device)
+        perm_z_j = z_j[perm]
+        perm_z.append(perm_z_j)
+
+    return torch.cat(perm_z, 1)
+
 
 
 class DeterministicWarmup(object):
@@ -43,23 +56,6 @@ def save_model_by_name(model):
 	torch.save(state, file_path)
 	print('Saved to {}'.format(file_path))
  
-class Attention(nn.Module):
-  def __init__(self, in_features, bias=False):
-    super().__init__()
-    self.M =  nn.Parameter(torch.nn.init.normal_(torch.zeros(in_features,in_features), mean=0, std=1))
-    self.sigmd = torch.nn.Sigmoid()
-    #self.M =  nn.Parameter(torch.zeros(in_features,in_features))
-    #self.A = torch.zeros(in_features,in_features).to(device)
-    
-  def attention(self, z, e):
-    a = z.matmul(self.M).matmul(e.permute(0,2,1))
-    a = self.sigmd(a)
-    #print(self.M)
-    A = torch.softmax(a, dim = 1)
-    e = torch.matmul(A,e)
-    return e, A
-
-
 
 # def _sigmoid(x):
 #     I = torch.eye(x.size()[0]).to(device)

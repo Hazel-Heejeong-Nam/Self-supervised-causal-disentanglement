@@ -22,7 +22,7 @@ from torch import autograd, nn, optim
 from torch import nn
 from torch.nn import functional as F
 from torch.nn import Linear
-device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
 
 
 

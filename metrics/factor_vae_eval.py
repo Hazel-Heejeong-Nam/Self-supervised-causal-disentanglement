@@ -6,7 +6,7 @@ Based on "Disentangling by Factorising" (https://arxiv.org/abs/1802.05983).
 from .m_utils import obtain_representation, gen_pendulum_factors, gen_pendulum_observation
 import numpy as np
 import torch
-device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
 from tqdm import trange
 
 def compute_factor_vae(ground_truth_data,

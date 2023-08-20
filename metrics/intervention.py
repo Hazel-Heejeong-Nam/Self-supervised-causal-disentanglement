@@ -3,7 +3,7 @@ from PIL import Image
 from torchvision.transforms import ToTensor
 import torch
 import matplotlib.pyplot as plt
-device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
 import os
 from utils import c_dataset
 

@@ -30,7 +30,7 @@ import torch
 from PIL import Image
 import torchvision.transforms as transforms
 import subprocess
-device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
 
 
 def generate_batch_factor_code(ground_truth_data, representation_function,

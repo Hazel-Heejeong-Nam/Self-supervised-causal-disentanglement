@@ -5,7 +5,7 @@ from main import parse_args
 import torch
 from model import tuningfork_vae
 import os
-device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
 
 
 if __name__ == "__main__":

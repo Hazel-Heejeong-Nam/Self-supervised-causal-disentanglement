@@ -10,7 +10,7 @@ from sklearn import linear_model
 from .m_utils import gen_pendulum_observation, gen_pendulum_factors
 import torch
 from tqdm import trange
-device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
 
 
 def compute_beta_vae_sklearn(ground_truth_data,representation_function,random_state,batch_size,num_train,num_eval):

@@ -12,7 +12,7 @@ from utils import log_bernoulli_with_logits, condition_prior, conditional_sample
 from utils import Encoder_share, Decoder_DAG, DagLayer, Attention, MaskLayer, Encoder_label
 from torch import nn
 from torch.nn import functional as F
-device = torch.device("cuda:1" if(torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
 from torch.autograd import Variable
 import torch.nn.init as init
 
@@ -42,17 +42,17 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         self.z_dim = z_dim
         self.net = nn.Sequential(
-            nn.Linear(z_dim, 1000),
+            nn.Linear(z_dim, 400),
             nn.LeakyReLU(0.2, True),
-            nn.Linear(1000, 1000),
+            nn.Linear(400, 400),
             nn.LeakyReLU(0.2, True),
-            nn.Linear(1000, 1000),
+            nn.Linear(400, 400),
             nn.LeakyReLU(0.2, True),
-            nn.Linear(1000, 1000),
+            nn.Linear(400, 400),
             nn.LeakyReLU(0.2, True),
-            nn.Linear(1000, 1000),
+            nn.Linear(400, 400),
             nn.LeakyReLU(0.2, True),
-            nn.Linear(1000, 2),
+            nn.Linear(400, 2),
         )
         self.weight_init()
 
@@ -117,10 +117,10 @@ class tuningfork_vae(nn.Module):
     
     def reparametrize(self,mu, logvar):
         std = logvar.div(2).exp()
-        eps = Variable(std.data.new(std.size()).normal_())
-        return mu + std*eps
-
-    def forward(self, x, gt, mask = None, sample = False, adj = None, alpha=0.3, beta=1, info='selfsup', stage=0, pretrain=False, lambdav=0.001):
+        eps = Variable(std.data.new(std.size()).normal_(),requires_grad=False)
+        res = mu + std*eps
+        return res
+    def forward(self, x, gt, mask = None, sample = False, adj = None, alpha=0.3, beta=1, info='selfsup', stage=0, pretrain=False, lambdav=0.001, dec=True, mask_loc=1):
         """
         Computes the Evidence Lower Bound, KL and, Reconstruction costs
 
@@ -140,16 +140,17 @@ class tuningfork_vae(nn.Module):
             label_kld = kl_divergence(labelmu, labelvar)
             
             label = self.reparametrize(labelmu, labelvar) # bs x concept
-            label_recon_img = self.dec.decode_label(label).reshape(x.size())
-            labelrec_loss = F.binary_cross_entropy_with_logits(label_recon_img.reshape(x.size()), x, size_average=False).div(x.shape[0])
+            if dec == True:
+                label_recon_img = self.dec.decode_label(label).reshape(x.size())
+                labelrec_loss = F.binary_cross_entropy_with_logits(label_recon_img.reshape(x.size()), x, reduction='sum').div(x.shape[0])
+            else :
+                label_recon_img=None
+                labelrec_loss = 0
             #labelrec_loss = log_bernoulli_with_logits(x, label_recon_img.reshape(x.size()))
             #labelrec_loss = -torch.mean(labelrec_loss)
         else : 
             label = gt
-            labelrec_loss=0
-            label_recon_img=0
-            label_kld=0
-            
+            labelrec_loss,label_recon_img, label_kld=0,0,0
         if pretrain:
             return labelrec_loss, label_kld, label_recon_img ,label
         
@@ -173,7 +174,7 @@ class tuningfork_vae(nn.Module):
         decode_m, decode_v = self.dag.calculate_dag(q_m_clone.to(device), torch.ones(q_m_clone.size()[0], self.z1_dim,self.z2_dim).to(device))
         decode_m, decode_v = decode_m.reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]),decode_v
         if sample == False:
-          if mask != None and mask < 2:
+          if mask != None and mask_loc ==1: 
               z_mask = torch.ones(q_m_clone.size()[0], self.z1_dim,self.z2_dim).to(device)*adj
               decode_m[:, mask, :] = z_mask[:, mask, :]
               decode_v[:, mask, :] = z_mask[:, mask, :]
@@ -190,20 +191,17 @@ class tuningfork_vae(nn.Module):
             
           f_z = self.mask_z.mix(m_zm).reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]).to(device)
           e_tilde = self.attn.attention(decode_m.reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]).to(device),q_m_clone.reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]).to(device))[0]
-          if mask != None and mask < 2:
+          ##########
+          if mask != None and mask_loc==1: # 0,1
               z_mask = torch.ones(q_m_clone.size()[0],self.z1_dim,self.z2_dim).to(device)*adj
               e_tilde[:, mask, :] = z_mask[:, mask, :]
               
           f_z1 = f_z+e_tilde
-          if mask!= None and mask == 2 :
+          if mask!= None and mask_loc==2 : 
               z_mask = torch.ones(q_m_clone.size()[0],self.z1_dim,self.z2_dim).to(device)*adj
               f_z1[:, mask, :] = z_mask[:, mask, :]
               m_zv[:, mask, :] = z_mask[:, mask, :]
-          if mask!= None and mask == 3 :
-              z_mask = torch.ones(q_m_clone.size()[0],self.z1_dim,self.z2_dim).to(device)*adj
-              f_z1[:, mask, :] = z_mask[:, mask, :]
-              m_zv[:, mask, :] = z_mask[:, mask, :]
-
+        ###########
           z_given_dag = conditional_sample_gaussian(f_z1, m_zv*lambdav)
         
         decoded_bernoulli_logits,x1,x2,x3,x4 = self.dec.decode_sep(z_given_dag.reshape([z_given_dag.size()[0], self.z_dim]), label_clone.to(device))
