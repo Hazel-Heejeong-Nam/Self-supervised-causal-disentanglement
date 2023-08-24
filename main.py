@@ -14,11 +14,11 @@ import matplotlib
 #matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from train import pretrain, train
-    
+import datetime
 
 def main_worker(args):
     torch.autograd.set_detect_anomaly(True)
-    args.model_name = f'{args.sup}_data_{args.dataset}_z{args.z_dim}_c{args.concept}_lr_{args.lr}_labelbeta_{args.l_beta}_epoch_{args.epoch}_dagweights_{args.l_dag_w1}_{args.l_dag_w2}_{args.c_dag_w1}_{args.c_dag_w2}'
+    args.model_name = f'{datetime.date.today().strftime("%m%d%Y")}_{args.sup}_data_{args.dataset}_z{args.z_dim}_c{args.concept}_lr_{args.lr}_labelbeta_{args.l_beta}_epoch_{args.epoch}_dagweights_{args.l_dag_w1}_{args.l_dag_w2}_{args.c_dag_w1}_{args.c_dag_w2}'
     args.device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
     
     disc = Discriminator(z_dim = args.concept).to(args.device)
@@ -35,14 +35,14 @@ def main_worker(args):
     
     if args.sup == 'selfsup':
         print('\n\n--------------START PRETRAINING')
-        disc, model= pretrain(args,train_loader,test_loader, disc, model, optimizer_D, optimizer)
-
+        disc, model, static= pretrain(args,train_loader,test_loader, disc, model, optimizer_D, optimizer)
+        save_model_by_name(model, static, 'pretrained')
     print('\n\n--------------START TRAINING')
-    model = train(args, train_loader, test_loader, disc, model, optimizer)          
+    model = train(args, train_loader, test_loader, disc, model, static, optimizer)          
     model.eval()
     
     save_DAG(model.dag.A, os.path.join(args.output_dir, args.model_name, 'A_final'))
-    save_model_by_name(model) # save final model
+    save_model_by_name(model,static, 'trained') # save final model
     # if not os.path.exists(os.path.join(args.output_dir, model_name, 'evals')): 
         #     os.makedirs(os.path.join(args.output_dir, model_name, 'evals'))
         
@@ -54,7 +54,7 @@ def main_worker(args):
         for i in range(args.concept):
             for j in range(-5,5):
                 with torch.no_grad():
-                    c_rec_loss, c_kl_loss, c_recon_img, mask_loss = model(img,gt, mask=i, sample=sample, adj=j*0, beta=args.c_beta, info= args.sup,stage=1)
+                    c_rec_loss, c_kl_loss, c_recon_img, mask_loss = model(img,gt, static, mask=i, sample=sample, adj=j*0, beta=args.c_beta, info= args.sup,stage=1)
 
             ax[i][idx].imshow(c_recon_img[0].squeeze(0).detach().cpu().permute(1,2,0))
             ax[i][idx].get_xaxis().set_visible(False)
@@ -81,9 +81,9 @@ def parse_args():
     parser.add_argument('--pretrain_epoch', type=int, default=100)
     parser.add_argument('--epoch', type=int, default=200)
     parser.add_argument('--batch_size', type=int, default=256)
-    parser.add_argument('--iter_show',   type=int, default=10, help="SCVAE : Save & Show every n epochs")
-    parser.add_argument('--pre_iter_show',   type=int, default=10, help="FactorVAE : Save & Show every n epochs")
-    parser.add_argument('--num_workers', type=int, default=4)
+    parser.add_argument('--iter_show',   type=int, default=20, help="SCVAE : Save & Show every n epochs")
+    parser.add_argument('--pre_iter_show',   type=int, default=20, help="FactorVAE : Save & Show every n epochs")
+    parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--output_dir',default='/home/work/YAI-Summer/hazel/codes/scvae/results', type=str, help='path to save results')
     # data attribute
     parser.add_argument('--z_dim', default=16, type=int)
@@ -98,12 +98,12 @@ def parse_args():
     parser.add_argument('--beta1_D', default=0.5, type=float, help='beta1 parameter of the Adam optimizer for the discriminator')
     parser.add_argument('--beta2_D', default=0.9, type=float, help='beta2 parameter of the Adam optimizer for the discriminator')
     # observer weights
-    parser.add_argument('--l_beta', default=10, type=float, help='KL weight for label observer') #### key
-    parser.add_argument('--l_gamma', default=10, type=float, help='gamma parameter label tc loss')
+    parser.add_argument('--l_beta', default=20, type=float, help='KL weight for label observer') #### key
+    parser.add_argument('--l_gamma', default=5, type=float, help='gamma parameter label tc loss')
     parser.add_argument('--l_dag_w1', default=12, type=float)
     parser.add_argument('--l_dag_w2', default=2, type=float)
     # interpreter weights 
-    parser.add_argument('--c_beta', default=4, type=float, help='KL weight for causality interpreter') #### key
+    parser.add_argument('--c_beta', default=10, type=float, help='KL weight for causality interpreter') #### key
     parser.add_argument('--c_dag_w1', default=3, type=float)
     parser.add_argument('--c_dag_w2', default=0.5, type=float)
     # options
@@ -124,9 +124,9 @@ def parse_args():
 
 if __name__ == "__main__":
     #seed 
-    random.seed(1)
-    torch.manual_seed(1)
-    torch.cuda.manual_seed_all(1)
+    random.seed(10)
+    torch.manual_seed(10)
+    torch.cuda.manual_seed_all(10)
 
     
     #arg parsing

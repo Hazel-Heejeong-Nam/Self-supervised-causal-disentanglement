@@ -120,7 +120,7 @@ class tuningfork_vae(nn.Module):
         eps = Variable(std.data.new(std.size()).normal_(),requires_grad=False)
         res = mu + std*eps
         return res
-    def forward(self, x, gt, mask = None, sample = False, adj = None, alpha=0.3, beta=1, info='selfsup', stage=0, pretrain=False, lambdav=0.001, dec=True, mask_loc=1):
+    def forward(self, x, gt, scale, mask = None, sample = False, adj = None, alpha=0.3, beta=1, info='selfsup', stage=0, pretrain=False, lambdav=0.001, dec=True, mask_loc=1):
         """
         Computes the Evidence Lower Bound, KL and, Reconstruction costs
 
@@ -210,7 +210,7 @@ class tuningfork_vae(nn.Module):
         finrec_loss = -torch.mean(finrec_loss)
 
         p_m, p_v = torch.zeros(q_m_clone.size()), torch.ones(q_m_clone.size())
-        cp_m, cp_v = condition_prior(self.scale, label_clone, self.z2_dim)
+        cp_m, cp_v = condition_prior(scale, label_clone, self.z2_dim)
         cp_v = torch.ones([q_m_clone.size()[0],self.z1_dim,self.z2_dim]).to(device)
         cp_z = conditional_sample_gaussian(cp_m.to(device), cp_v.to(device))
         kl = torch.zeros(1).to(device)

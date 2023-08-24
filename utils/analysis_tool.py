@@ -38,11 +38,16 @@ def save_DAG(A, name):
     
     
 # label에 sigmoid 해서 normalize 해둠
-def label_traverse(args, epoch, model, model_name, loader, pretrain, lowlimit=-3, uplimit=3, inter=2/3, loc=-1):
+def label_traverse(args, epoch, static, model, model_name, loader, pretrain, loc=-1):
     model.eval()
 
-    interpolation = torch.arange(lowlimit, uplimit+0.1, inter)
+    # for label traversing
+    lowlimit = static[:,0] - 4*static[:,1] # 4,
+    uplimit = static[:,0] + 4*static[:,1] # 4, 
+    inter = 4*static[:,1] / 9 # 4, 
 
+    interpolation = [torch.arange(lowlimit[i], uplimit[i]+0.1, inter[i]) for i in range(lowlimit.size(0))]
+    ###
     n_dsets = len(loader)
     rand_idx = random.randint(1, n_dsets-1)
     fixed_idx = 0
@@ -62,10 +67,10 @@ def label_traverse(args, epoch, model, model_name, loader, pretrain, lowlimit=-3
         samples = []
         for row in range(args.concept):
             z = z_ori.clone() # z_dim
-            for val in interpolation:
+            for val in interpolation[row]:
                 # 여기다 여기
                 z[:, row] = val
-                sample = F.sigmoid(model.dec.decode_label(z).reshape(img.size()))
+                sample = torch.sigmoid(model.dec.decode_label(z).reshape(img.size()))
                 #sample = model.dec.decode_label(z).reshape(img.size())
                 gifs.append(sample)
 
@@ -80,7 +85,7 @@ def label_traverse(args, epoch, model, model_name, loader, pretrain, lowlimit=-3
     os.makedirs(output_dir, exist_ok=True)    
     outlen = args.z_dim//args.z2_dim #4
     gifs = torch.cat(gifs)
-    gifs = gifs.reshape(2, outlen, len(interpolation),4, 96, 96).transpose(1, 2)
+    gifs = gifs.reshape(2, outlen, len(interpolation[0]),4, 96, 96).transpose(1, 2)
     
     
     

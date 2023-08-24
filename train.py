@@ -9,6 +9,7 @@ import argparse
 from torchvision.utils import save_image
 import random
 import copy
+import numpy as np
 from tqdm import trange
 
 
@@ -18,7 +19,7 @@ def pretrain(args,train_loader,test_loader, Discriminator,model,optimizer_D,opti
         pre_total_kl = 0
         pre_total_rec = 0
         pre_total_tc = 0
-        
+        label_list = []
         for idx, (img, gt ) in enumerate(train_loader):
             img = img.to(args.device) # bs x 4 x 96 x 96
             # for factor vae
@@ -28,40 +29,43 @@ def pretrain(args,train_loader,test_loader, Discriminator,model,optimizer_D,opti
             gt_1 = gt[:halflen]
             gt_2 = gt[halflen:]
 
-            label_rec_loss, label_kl_loss, label_recon_img ,label= model(img_1, gt_1, beta=args.c_beta, info= args.sup,stage=0, pretrain=True)
+            label_rec_loss, label_kl_loss, label_recon_img ,label= model(img_1, gt_1, None, beta=args.c_beta, info= args.sup,stage=0, pretrain=True)
             D_z = Discriminator(label)
-            D_z2 = Discriminator(label.detach())
+            #D_z2 = Discriminator(label.detach())
             label_tc_loss = (D_z[:, :1] - D_z[:, 1:]).mean()
             loss_pre = label_rec_loss + args.l_beta* label_kl_loss + args.l_gamma * label_tc_loss
             optimizer.zero_grad()
-            loss_pre.backward()
-            optimizer.step()
-        
+            loss_pre.backward(retain_graph=True)
             
-            D_label_rec_loss, D_label_kl_loss, D_label_recon_img ,D_label= model(img_2, gt_2, beta=args.c_beta, info= args.sup,stage=0, pretrain=True, dec=False)
+            D_label_rec_loss, D_label_kl_loss, D_label_recon_img ,D_label= model(img_2, gt_2, None, beta=args.c_beta, info= args.sup,stage=0, pretrain=True, dec=False)
             label_perm = permute_dims(D_label).detach()
             D_perm = Discriminator(label_perm)
-            D_tc_loss = 0.5*(F.cross_entropy(D_z2, torch.zeros(img_1.size(0), dtype=torch.long, device=args.device)) + F.cross_entropy(D_perm,torch.ones(img_2.size(0), dtype=torch.long, device=args.device)))
-            print(label_tc_loss, D_tc_loss)
+            D_tc_loss = 0.5*(F.cross_entropy(D_z, torch.zeros(img_1.size(0), dtype=torch.long, device=args.device)) + F.cross_entropy(D_perm,torch.ones(img_2.size(0), dtype=torch.long, device=args.device)))
+            #print(label_tc_loss, D_tc_loss)
             optimizer_D.zero_grad()
             D_tc_loss.backward()
+            
+            optimizer.step()
             optimizer_D.step()
 
-
+            label_list = label_list + list(D_label.detach().cpu()) +  list(label.detach().cpu())
             pre_total += loss_pre.item()
             pre_total_kl += label_kl_loss.item()
             pre_total_rec += label_rec_loss.item()
             pre_total_tc += label_tc_loss.item()
             
             m = len(train_loader)
-            
+        
+        label_list = torch.stack(label_list,dim=0)
+        static= torch.stack((label_list.mean(dim=0), label_list.std(dim=0)), dim=1) # for self.scale
+
         if epoch % args.pre_iter_show == 0:
             print(f'Pretrain epoch {epoch+1}    total : {pre_total/m}, kl : {pre_total_kl/m}, rec : {pre_total_rec/m} tc : {pre_total_tc/m}')
-            label_traverse(args, epoch, model,args.model_name, test_loader, pretrain=True)
+            label_traverse(args, epoch, static, model,args.model_name, test_loader, pretrain=True)
 
-    return Discriminator, model
+    return Discriminator, model, static
 
-def train(args,train_loader, test_loader,Discriminator, model, optimizer):
+def train(args,train_loader, test_loader,Discriminator, model, static, optimizer):
     Discriminator.eval()
     for epoch in trange(args.epoch):
     
@@ -81,7 +85,7 @@ def train(args,train_loader, test_loader,Discriminator, model, optimizer):
                 optimizer.zero_grad()
     
                 
-                label_rec_loss, label_kl_loss, label_recon_img ,label= model(img, gt, beta=args.c_beta, info= args.sup,stage=0, pretrain=True)
+                label_rec_loss, label_kl_loss, label_recon_img ,label= model(img, gt, static, beta=args.c_beta, info= args.sup,stage=0, pretrain=True)
                 D_z = Discriminator(label)
                 label_tc_loss = (D_z[:, :1] - D_z[:, 1:]).mean()
                 dag_param = model.dag.A # 4 x 4
@@ -95,7 +99,7 @@ def train(args,train_loader, test_loader,Discriminator, model, optimizer):
             
             #stage 1
             optimizer.zero_grad()
-            c_rec_loss, c_kl_loss, c_recon_img, mask_loss = model(img, gt, beta=args.c_beta, info= args.sup,stage=1)
+            c_rec_loss, c_kl_loss, c_recon_img, mask_loss = model(img, gt, static, beta=args.c_beta, info= args.sup,stage=1)
             dag_param = model.dag.A # 4 x 4
             h_a1 = h_A(dag_param, dag_param.size()[0])
             loss1 = c_kl_loss + c_rec_loss + mask_loss + args.c_dag_w1*h_a1 + args.c_dag_w2 *h_a1*h_a1
@@ -127,7 +131,7 @@ def train(args,train_loader, test_loader,Discriminator, model, optimizer):
             if args.sup == 'selfsup':
                 print(f'                    label recon: {total_l_rec/m}, label kl: {total_l_kl/m}, label_tc : {total_l_tc/m}')
                 save_imgsets([img[0], c_recon_img[0], label_recon_img[0]], save_path)
-                label_traverse(args, epoch, model,args.model_name, test_loader,pretrain=False)
+                label_traverse(args, epoch, static, model,args.model_name, test_loader,pretrain=False)
             else :
                 save_imgsets([img[0], c_recon_img[0]], save_path)
     return model

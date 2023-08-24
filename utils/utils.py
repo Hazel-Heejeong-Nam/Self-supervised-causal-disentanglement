@@ -47,12 +47,12 @@ class DeterministicWarmup(object):
 		self.t = self.t_max if t > self.t_max else t
 		return self.t
 
-def save_model_by_name(model):
+def save_model_by_name(model, static, name):
 	save_dir = os.path.join('checkpoints', model.name)
 	if not os.path.exists(save_dir):
 		os.makedirs(save_dir)
-	file_path = os.path.join(save_dir, 'model_trained.pt')
-	state = model.state_dict()
+	file_path = os.path.join(save_dir, f'model_{name}.pt')
+	state = {'state_dict': model.state_dict(), 'static': static} 
 	torch.save(state, file_path)
 	print('Saved to {}'.format(file_path))
  
