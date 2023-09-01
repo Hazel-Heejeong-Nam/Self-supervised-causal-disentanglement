@@ -43,7 +43,7 @@ def gen(i,j,shade,mid):
   ax.set_ylim((-1, 21))
 
   plt.axis('off')
-  plt.savefig('/mnt/hazel/data/causal_data/pendulum/eval/a_' + str(int(i)) + '_' + str(int(j)) + '_' + str(int(shade)) + '_' + str(int(mid)) +'.png')
+  plt.savefig('/home/work/YAI-Summer/hazel/data/causal_data/pendulum/eval/a_' + str(int(i)) + '_' + str(int(j)) + '_' + str(int(shade)) + '_' + str(int(mid)) +'.png')
   
 if __name__ =="__main__":
   combi = [

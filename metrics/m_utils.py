@@ -180,9 +180,9 @@ def gradient_boosting_classifier():
 
 
 
-if not os.path.exists('/mnt/hazel/data/causal_data/pendulum/'): 
-  os.makedirs('/mnt/hazel/data/causal_data/pendulum/train/')
-  os.makedirs('/mnt/hazel/data/causal_data/pendulum/test/')
+if not os.path.exists('/home/work/YAI-Summer/hazel/data/causal_data/pendulum/'): 
+  os.makedirs('/home/work/YAI-Summer/hazel/data/causal_data/pendulum/train/')
+  os.makedirs('/home/work/YAI-Summer/hazel/data/causal_data/pendulum/test/')
 
 def projection(theta, phi, x, y, base = -0.5):
     b = y-x*math.tan(phi)

@@ -42,9 +42,9 @@ def label_traverse(args, epoch, static, model, model_name, loader, pretrain, loc
     model.eval()
 
     # for label traversing
-    lowlimit = static[:,0] - 4*static[:,1] # 4,
-    uplimit = static[:,0] + 4*static[:,1] # 4, 
-    inter = 4*static[:,1] / 9 # 4, 
+    lowlimit = static[:,0] - 2*static[:,1] # 4,
+    uplimit = static[:,0] + 2*static[:,1] # 4, 
+    inter = 2*static[:,1] / 9 # 4, 
 
     interpolation = [torch.arange(lowlimit[i], uplimit[i]+0.1, inter[i]) for i in range(lowlimit.size(0))]
     ###
