@@ -120,7 +120,7 @@ class tuningfork_vae(nn.Module):
         eps = Variable(std.data.new(std.size()).normal_(),requires_grad=False)
         res = mu + std*eps
         return res
-    def forward(self, x, gt, scale, mask = None, sample = False, adj = None, alpha=0.3, beta=1, info='selfsup', stage=0, pretrain=False, lambdav=0.001, dec=True, mask_loc=1):
+    def forward(self, x, gt, scale, mask_loc, mask = None, sample = False, adj = None, alpha=0.3, beta=1, info='selfsup', stage=0, pretrain=False, lambdav=0.001, dec=True):
         """
         Computes the Evidence Lower Bound, KL and, Reconstruction costs
 
@@ -174,7 +174,7 @@ class tuningfork_vae(nn.Module):
         decode_m, decode_v = self.dag.calculate_dag(q_m_clone.to(device), torch.ones(q_m_clone.size()[0], self.z1_dim,self.z2_dim).to(device))
         decode_m, decode_v = decode_m.reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]),decode_v
         if sample == False:
-          if mask != None and mask_loc ==1: 
+          if mask != None and (mask == mask_loc[0] or mask ==mask_loc[1]): #light, pendulum
               z_mask = torch.ones(q_m_clone.size()[0], self.z1_dim,self.z2_dim).to(device)*adj
               decode_m[:, mask, :] = z_mask[:, mask, :]
               decode_v[:, mask, :] = z_mask[:, mask, :]
@@ -192,12 +192,12 @@ class tuningfork_vae(nn.Module):
           f_z = self.mask_z.mix(m_zm).reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]).to(device)
           e_tilde = self.attn.attention(decode_m.reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]).to(device),q_m_clone.reshape([q_m_clone.size()[0], self.z1_dim,self.z2_dim]).to(device))[0]
           ##########
-          if mask != None and mask_loc==1: # 0,1
+          if mask != None and (mask == mask_loc[0] or mask ==mask_loc[1]): # 0,1
               z_mask = torch.ones(q_m_clone.size()[0],self.z1_dim,self.z2_dim).to(device)*adj
               e_tilde[:, mask, :] = z_mask[:, mask, :]
               
           f_z1 = f_z+e_tilde
-          if mask!= None and mask_loc==2 : 
+          if mask!= None and (mask == mask_loc[2] or mask ==mask_loc[3]): 
               z_mask = torch.ones(q_m_clone.size()[0],self.z1_dim,self.z2_dim).to(device)*adj
               f_z1[:, mask, :] = z_mask[:, mask, :]
               m_zv[:, mask, :] = z_mask[:, mask, :]
@@ -222,7 +222,7 @@ class tuningfork_vae(nn.Module):
         mask_kl = torch.zeros(1).to(device)
         mask_kl2 = torch.zeros(1).to(device)
 
-        for i in range(4):
+        for i in range(self.z1_dim):
             mask_kl = mask_kl + 1*kl_normal(f_z1[:,i,:].to(device), cp_v[:,i,:].to(device),cp_m[:,i,:].to(device), cp_v[:,i,:].to(device))
         
         mask_l = torch.mean(mask_kl) + u_loss

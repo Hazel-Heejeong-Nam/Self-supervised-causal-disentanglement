@@ -30,6 +30,7 @@ def check_label(representation_function):
         assert len(label_dict[key])==2
         #score = softmax(torch.abs(label_dict[key][0] - label_dict[key][1]))
         score = torch.abs(label_dict[key][0] - label_dict[key][1])
+        print(score)
         target = torch.argmax(softmax(score))
         loss=ce_cri(score, target)
         print(f'factor : {key}       target : {target}       loss : {loss:.4f} ')

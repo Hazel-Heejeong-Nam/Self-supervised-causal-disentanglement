@@ -13,7 +13,7 @@ from tqdm import trange
 import matplotlib
 #matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from train import pretrain, train
+from train import train
 import datetime
 
 def main_worker(args):
@@ -24,8 +24,18 @@ def main_worker(args):
     checkpoint = torch.load(args.checkpoint)
     missing_keys, unexpected_keys = model.load_state_dict(checkpoint['state_dict'], strict=False)
     assert missing_keys == [] and unexpected_keys == []
+    static = checkpoint['static']
+    args.model_name = args.checkpoint.split('/')[1]
+    os.makedirs(os.path.join('results_ours2', args.model_name), exist_ok=True)
 
+    #################custom -> get this from label check
 
+    length = 3
+    light = 1
+    pendulum = 0
+    loc = 3
+
+    ###################
 
 
     if not os.path.exists(args.output_dir): 
@@ -34,29 +44,29 @@ def main_worker(args):
     test_loader = c_dataset(os.path.join(args.data_root,args.dataset, 'test'), 1,args.num_workers, shuffle=False)
    
     model.eval()
+    dag_param = model.dag.A
+    save_DAG(dag_param, os.path.join('results_ours2', args.model_name, 'A_final'))
 
     sample = False
-    fig, ax = plt.subplots(ncols=10, nrows=args.concept+1, figsize=(40,15))  
-    plt.subplots_adjust(wspace=0, hspace=0)
-    for idx, (img, gt) in enumerate(test_loader):
-        img = img.to(args.device) # bs x 4 x 96 x 96
+    img, gt = next(iter(train_loader))
+    img, gt = img.to(args.device)[:10] , gt[:10] # 10 x 4 x 96 x 96
+    for j in [0,0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 3.5, 4,5,6,7,8,9]:
+        fig, ax = plt.subplots(ncols=10, nrows=args.concept+1, figsize=(40,15))  
+        plt.subplots_adjust(wspace=0, hspace=0)
         for i in range(args.concept):
-            j=2
             with torch.no_grad():
-                c_rec_loss, c_kl_loss, c_recon_img, mask_loss = model(img,gt, checkpoint['static'], mask=i, sample=sample, adj=j, beta=args.c_beta, info= args.sup,stage=1, mask_loc=2)
+                c_rec_loss, c_kl_loss, c_recon_img, mask_loss = model(img,gt, static, mask=i, sample=sample, adj=j, beta=args.c_beta, info= args.sup,stage=1, mask_loc = [0,1,2,3])
+            for k in range(img.size(0)):
+                ax[i][k].imshow(c_recon_img[k].squeeze(0).detach().cpu().permute(1,2,0))
+                ax[i][k].get_xaxis().set_visible(False)
+                ax[i][k].get_yaxis().set_visible(False)
+        for k in range(img.size(0)):
+            ax[args.concept][k].imshow(img[k].squeeze(0).detach().cpu().permute(1,2,0))
+            ax[args.concept][k].get_xaxis().set_visible(False)
+            ax[args.concept][k].get_yaxis().set_visible(False)  
+        plt.savefig(os.path.join('results_ours2', args.model_name, f'do_operation_adj_{j}.png'))
 
-            ax[i][idx].imshow(c_recon_img[0].squeeze(0).detach().cpu().permute(1,2,0))
-            ax[i][idx].get_xaxis().set_visible(False)
-            ax[i][idx].get_yaxis().set_visible(False)
-        ax[args.concept][idx].imshow(img[0].squeeze(0).detach().cpu().permute(1,2,0))
-        ax[args.concept][idx].get_xaxis().set_visible(False)
-        ax[args.concept][idx].get_yaxis().set_visible(False)
-        if idx == 9:
-            break
 
-    plt.savefig('do_operation.png')
-    #mic = subprocess.call('mictools')
-    #tic = subprocess.call('mictools')
 
     
     
@@ -64,7 +74,7 @@ def main_worker(args):
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     #
-    parser.add_argument('--checkpoint', type=str, default='checkpoints/08242023_selfsup_data_pendulum_z16_c4_lr_0.0001_labelbeta_20_epoch_200_dagweights_12_2_3_0.5/model_trained.pt')
+    parser.add_argument('--checkpoint', type=str, default='checkpoints/09122023_seed1sche_True_selfsup_data_pendulum_z16_c4_obs_betavae_Llr_0.001_Clr_0.0003_labelbeta_20.0_cbeta_4.0_epoch_500_dagweights_1.5_0.25_3_0.5/model_trained.pt')
 
 
     # data

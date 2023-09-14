@@ -12,12 +12,12 @@ import copy
 import numpy as np
 from tqdm import trange
 
-def train(args,train_loader, test_loader,Discriminator, model, optimizer_D, optimizer_L, optimizer_C):
+def train(args,train_loader, test_loader,Discriminator, model, optimizer_D, optimizer_L, optimizer_C, schedule_L, schedule_C):
     if args.sup == 'selfsup':
         static = torch.Tensor([[0,1],[0,1],[0,1],[0,1]])# initial static
     else :
-        static = None # 나중에는 predefined 로 바꿔줘야함
-
+        static = torch.Tensor([[0,44],[100,40],[6.5, 3.5],[10,5]]) # 나중에는 predefined 로 바꿔줘야함
+    temp_maskloc = [1,2,3,4]
 
     for epoch in trange(args.epoch):
     
@@ -33,7 +33,7 @@ def train(args,train_loader, test_loader,Discriminator, model, optimizer_D, opti
             if args.sup =='selfsup' and args.observer =='betavae':
                 #stage 0
                 optimizer_L.zero_grad()
-                label_rec_loss, label_kl_loss, label_recon_img ,label= model(img, gt, static, beta=args.c_beta, info= args.sup,stage=0)
+                label_rec_loss, label_kl_loss, label_recon_img ,label= model(img, gt, static, beta=args.c_beta, info= args.sup,stage=0, mask_loc=temp_maskloc)
                 dag_param = model.dag.A # 4 x 4
                 h_a0 = h_A(dag_param, dag_param.size()[0])
                 loss0 = label_rec_loss + args.l_beta* label_kl_loss+ args.l_dag_w1 * h_a0 + args.l_dag_w2 *h_a0*h_a0 
@@ -48,7 +48,7 @@ def train(args,train_loader, test_loader,Discriminator, model, optimizer_D, opti
                 img_1, img_2 = img[:halflen], img[halflen:]
                 gt_1, gt_2 = gt[:halflen], gt[halflen:]
 
-                label_rec_loss, label_kl_loss, label_recon_img ,label= model(img_1, gt_1, static, beta=args.c_beta, info= args.sup,stage=0)
+                label_rec_loss, label_kl_loss, label_recon_img ,label= model(img_1, gt_1, static, beta=args.c_beta, info= args.sup,stage=0,  mask_loc=temp_maskloc)
                 D_z = Discriminator(label)
                 label_tc_loss = (D_z[:, :1] - D_z[:, 1:]).mean()
                 loss_pre = label_rec_loss + args.l_beta* label_kl_loss + args.l_gamma * label_tc_loss + args.l_dag_w1 * h_a0 + args.l_dag_w2 *h_a0*h_a0 
@@ -71,7 +71,7 @@ def train(args,train_loader, test_loader,Discriminator, model, optimizer_D, opti
             
             #stage 1
             optimizer_C.zero_grad()
-            c_rec_loss, c_kl_loss, c_recon_img, mask_loss = model(img, gt, static, beta=args.c_beta, info= args.sup,stage=1)
+            c_rec_loss, c_kl_loss, c_recon_img, mask_loss = model(img, gt, static, beta=args.c_beta, info= args.sup,stage=1,  mask_loc=temp_maskloc)
             dag_param = model.dag.A # 4 x 4
             h_a1 = h_A(dag_param, dag_param.size()[0])
             loss1 = c_kl_loss + c_rec_loss + mask_loss + args.c_dag_w1*h_a1 + args.c_dag_w2 *h_a1*h_a1
@@ -81,13 +81,17 @@ def train(args,train_loader, test_loader,Discriminator, model, optimizer_D, opti
             total_DAG = total_DAG + (h_a0 + h_a1)/2
             total_c_rec += c_rec_loss.item()
             total_c_kl += c_kl_loss.item()
+        
+        if args.schedule:
+            schedule_L.step()
+            schedule_C.step()
 
 
         if args.sup =='selfsup':
             label_list = torch.stack(label_list,dim=0)
             static= torch.stack((label_list.mean(dim=0), label_list.std(dim=0)), dim=1) # for self.scale
         else :
-            static = None
+            static = torch.Tensor([[0,44],[100,40],[6.5, 3.5],[10,5]])
 
         m = len(train_loader)
         if epoch % args.iter_show == 0:
