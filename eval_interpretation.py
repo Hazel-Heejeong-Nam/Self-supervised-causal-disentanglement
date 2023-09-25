@@ -24,14 +24,14 @@ def main_worker(args):
     assert missing_keys == [] and unexpected_keys == []
     static = checkpoint['static']
     args.model_name = args.checkpoint.split('/')[1]
-    os.makedirs(os.path.join('results_ours', args.model_name), exist_ok=True)
+    os.makedirs(os.path.join('result_interpret', args.model_name), exist_ok=True)
 
     #################custom -> get this from label check
 
-    length = 3
-    light = 1
-    pendulum = 0
-    loc = 3
+    length = args.length
+    light = args.light
+    pendulum = args.pendulum
+    loc = args.loc
 
     ###################
 
@@ -43,7 +43,7 @@ def main_worker(args):
    
     model.eval()
     dag_param = model.dag.A
-    save_DAG(dag_param, os.path.join('results_ours', args.model_name, 'A_final'))
+    save_DAG(dag_param, os.path.join('result_interpret', args.model_name, 'A_final'))
 
     sample = False
     img, gt = next(iter(train_loader))
@@ -62,7 +62,7 @@ def main_worker(args):
             ax[args.concept][k].imshow(img[k].squeeze(0).detach().cpu().permute(1,2,0))
             ax[args.concept][k].get_xaxis().set_visible(False)
             ax[args.concept][k].get_yaxis().set_visible(False)  
-        plt.savefig(os.path.join('results_ours', args.model_name, f'do_operation_adj_{j}.png'))
+        plt.savefig(os.path.join('result_interpret', args.model_name, f'do_operation_adj_{j}.png'))
 
 
 
@@ -73,10 +73,16 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     #
     parser.add_argument('--checkpoint', type=str, default='checkpoints/09122023_seed1sche_True_selfsup_data_pendulum_z16_c4_obs_betavae_Llr_0.001_Clr_0.0003_labelbeta_20.0_cbeta_4.0_epoch_500_dagweights_1.5_0.25_3_0.5/model_trained.pt')
+    parser.add_argument('--length', type=int, default=None, help='label for shadow length')
+    parser.add_argument('--light', type=int, default=None, help='label for light position')
+    parser.add_argument('--pendulum', type=int, default=None, help='label for pendulum angle')
+    parser.add_argument('--loc', type=int, default=None, help='label for shadow location')
+    
+
 
 
     # data
-    parser.add_argument('--data_root', type=str, default='/home/work/YAI-Summer/hazel/data/causal_data')
+    parser.add_argument('--data_root', type=str, default='./data/causal_data')
     parser.add_argument('--dataset', default='pendulum', type=str, help='pendulum | flow_noise')
     parser.add_argument('--pretrain_epoch', type=int, default=100)
     parser.add_argument('--epoch', type=int, default=250)
@@ -84,7 +90,7 @@ def parse_args():
     parser.add_argument('--iter_show',   type=int, default=20, help="SCVAE : Save & Show every n epochs")
     parser.add_argument('--pre_iter_show',   type=int, default=20, help="FactorVAE : Save & Show every n epochs")
     parser.add_argument('--num_workers', type=int, default=8)
-    parser.add_argument('--output_dir',default='/home/work/YAI-Summer/hazel/codes/scvae/results', type=str, help='path to save results')
+    parser.add_argument('--output_dir',default='./results', type=str, help='path to save results')
     # data attribute
     parser.add_argument('--z_dim', default=16, type=int)
     parser.add_argument('--concept', default = 4, type= int)

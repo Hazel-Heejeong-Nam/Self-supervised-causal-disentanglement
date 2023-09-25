@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd 
 
 
-base = '../../data/causal_data'
+base = './data/causal_data'
 if not os.path.isdir(base):
     os.makedirs(base, exist_ok=True)
 if not os.path.exists(os.path.join(base,'pendulum')): 

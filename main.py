@@ -49,9 +49,9 @@ def main_worker(args):
     mean_loss, target , key = check_label(representation_function)
     
 
-    txt_name = os.path.join(args.output_dir, f'{datetime.date.today().strftime("%m%d%Y")}_summary_finalours.txt')
+    txt_name = os.path.join(args.output_dir, f'{datetime.date.today().strftime("%m%d%Y")}_summary.txt')
     with open(txt_name, 'a' if os.path.isfile(txt_name) else 'w') as f:
-        f.write(f'===================== {args.schedule} LR-lable: {args.l_lr} || LR-causality: {args.c_lr} || seed : {args.seed} =======================\n')
+        f.write(f'===================== {args.model_name} =======================\n')
         f.write(args.model_name,)
         f.write(f'\nDAG SCORE: {dag_score:.6f}\n')
         f.write(f'Label Disentanglement (Average): {mean_loss:.4f}\n')
@@ -64,11 +64,11 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     
     # data
-    parser.add_argument('--data_root', type=str, default='/home/work/YAI-Summer/hazel/data/causal_data')
-    parser.add_argument('--dataset', default='pendulum', type=str, help='pendulum | flow_noise')
+    parser.add_argument('--data_root', type=str, default='./data/causal_data')
+    parser.add_argument('--dataset', default='pendulum', type=str)
     parser.add_argument('--epoch', type=int, default=500)
     parser.add_argument('--batch_size', type=int, default=512)
-    parser.add_argument('--iter_show',   type=int, default=40, help="SCVAE : Save & Show every n epochs")
+    parser.add_argument('--iter_show',   type=int, default=40, help="Save & Show every n epochs")
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--output_dir',default='./results', type=str, help='path to save results')
     # data attribute
@@ -96,8 +96,8 @@ def parse_args():
     parser.add_argument('--sup', default='unsup', help='unsup : causalVAE w/o label , selfsup : scvae, weaksup : causalVAE',choices=['unsup', 'selfsup', 'weaksup']) 
     # # evaluate
     # parser.add_argument('--metric', type=str, default = 'label',choices=['betavae','factorvae','label','do'])
-    parser.add_argument('--gt_path', type=str, default='/home/work/YAI-Summer/hazel/data/causal_data/pendulum')
-    parser.add_argument('--model_path', type=str, default='/home/work/YAI-Summer/hazel/codes/scvae/checkpoints')
+    parser.add_argument('--gt_path', type=str, default='./data/causal_data/pendulum')
+    parser.add_argument('--model_path', type=str, default='./checkpoints')
     parser.add_argument('--model_name', type=str, default=None)
     parser.add_argument('--num_train', type=int, default=1000)
     parser.add_argument('--num_eval', type=int, default=500)

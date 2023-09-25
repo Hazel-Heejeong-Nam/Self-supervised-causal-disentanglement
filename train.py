@@ -16,7 +16,7 @@ def train(args,train_loader, test_loader,Discriminator, model, optimizer_D, opti
     if args.sup == 'selfsup':
         static = torch.Tensor([[0,1],[0,1],[0,1],[0,1]])# initial static
     else :
-        static = torch.Tensor([[0,44],[100,40],[6.5, 3.5],[10,5]]) # 나중에는 predefined 로 바꿔줘야함
+        static = torch.Tensor([[0,44],[100,40],[6.5, 3.5],[10,5]]) 
     temp_maskloc = [1,2,3,4]
 
     for epoch in trange(args.epoch):

@@ -33,7 +33,7 @@ def check_label(representation_function):
         print(score)
         target = torch.argmax(softmax(score))
         loss=ce_cri(score, target)
-        print(f'factor : {key}       target : {target}       loss : {loss:.4f} ')
+        print(f'factor : {key}       target : {target}       loss : {loss:.4f} \n')
         loss_list.append(loss)
         target_list.append(target)
         key_list.append(key)
