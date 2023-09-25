@@ -1,17 +1,87 @@
-# Self supervised causal disentanglement through generative models
-
-This project is an ongoing project as part of an individual graduation project in Yonsei University, Seoul, South Korea. 
-
-Our model aims to learn causality without any priori or inductive bias. This has two main compositions: Observer and interpreter.
+# SCADI : Self-supervised CAusal DIsentanglement in latent variable models
 
 <img src="https://github.com/Hazel-Heejeong-Nam/Self-supervised-causal-disentanglement/assets/100391059/93560b8b-6556-4ed9-9919-e11a6758fcb0"  width="500">
 
-- Observer for the model is written based on Beta-VAE from Higgins et al., pytorch-implementation from
-  
-  - <https://github.com/1Konny/Beta-VAE>
+### Environment setting and Requirements
 
-- Interpreter for the model is written based on CausalVAE from Yang et al.
+```
+conda create -n scadi python=3.8 -y
+conda activate sacdi
+conda install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.3 -c pytorch -y
+pip install -U scikit-learn
+conda install -c conda-forge imagemagick
+```
 
-  - <https://github.com/huawei-noah/trustworthyAI/tree/master/research/CausalVAE>
+### Git clone repo
 
-Contact **hatbi2000@yonsei.ac.kr** for any question or collaboration. 
+```
+git clone https://github.com/Hazel-Heejeong-Nam/Self-supervised-causal-disentanglement.git
+```
+
+# Train
+
+### 1. Create pendulum dataset (Yang et al.)
+``` bash
+python pendulum_dataset.py
+```
+### 2. Train model
+``` bash
+python main.py
+```
+```
+Self-supervised-causal-disentanglement
+├── results
+│      ├── ${model name}
+│      |      ├──  epoch0
+│      |      │      ├──  A_epoch0.png
+│      |      │      ├──  fixed_img.gif
+│      |      │      ├──  random_img.gif
+│      |      │      └──  reconstructed.png
+│      |      ├──  epoch40
+│      |      ├──  epoch80
+│      |      ├──  ...
+│      |      └──  A_final.png
+│      ├── ...
+│      └── ${data}_summary.txt
+└── ...
+
+```
+
+# Evaluate
+
+### 3. Create evaluation dataset
+``` bash
+python evalset.py
+```
+
+### 4. Evaluate Observer
+``` bash
+python eval_observation.py
+```
+```
+tensor([0.2373, 0.1229, 0.1112, 0.0797], device='cuda:0',grad_fn=<AbsBackward0>)
+factor : length       target : 0       loss : 1.2886 
+
+tensor([0.4170, 0.1543, 0.0613, 0.0176], device='cuda:0',grad_fn=<AbsBackward0>)
+factor : light       target : 0       loss : 1.1443 
+
+tensor([0.1152, 0.1590, 0.0667, 0.1096], device='cuda:0',grad_fn=<AbsBackward0>)
+factor : pendulum       target : 1       loss : 1.3404 
+
+tensor([0.1036, 0.0864, 0.0104, 0.0023], device='cuda:0',grad_fn=<AbsBackward0>)
+factor : shadloc       target : 0       loss : 1.3344 
+```
+
+### 5. Evaluate Interpreter
+``` bash
+python eval_interpretation.py --length ${label length} --light ${label light} --pendulum ${label pendulum} --loc ${label loc} --checkpoint ${checkpoint dir}
+```
+
+
+
+- SCADI is written based on :
+  - <https://github.com/1Konny/Beta-VAE> (Beta-VAE from Higgins et al.)
+  - <https://github.com/huawei-noah/trustworthyAI/tree/master/research/CausalVAE> (CausalVAE from Yang et al.)
+  - <https://github.com/google-research/disentanglement_lib> (Google research disentanglement library)
+
+Contact **hatbi2000@yonsei.ac.kr** for further question. 
