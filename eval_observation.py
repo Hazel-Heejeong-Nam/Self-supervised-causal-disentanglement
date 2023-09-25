@@ -1,5 +1,5 @@
 import argparse 
-from metrics import betavae, factorvae, check_label, do_op
+from metrics import check_label
 import numpy as np
 from main import parse_args
 import torch
@@ -22,13 +22,7 @@ if __name__ == "__main__":
     missing_keys, unexpected_keys = tmodel.load_state_dict(state['state_dict'], strict=False)
     assert missing_keys == [] and unexpected_keys == [] 
     tmodel.eval()
-    #representation_function = lambda x : tmodel.reparametrize(tmodel.enc_label(tmodel.enc_share(x)[0])[0],tmodel.enc_label(tmodel.enc_share(x)[0])[1])
     representation_function = lambda x : tmodel.enc_label(tmodel.enc_share(x)[0])[0]
-
-    #set random state
-    random_state = np.random.RandomState(0)
-    beta_scores = betavae(ground_truth_data, representation_function, random_state, args.eval_batch_size,args.num_train, args.num_eval)
-    # factor_scores = factorvae(ground_truth_data, representation_function, random_state, args.eval_batch_size, args.num_train, args.num_eval, 500) # random_state, 5, 3000,2000, 2500)
     mean_loss, target, key = check_label(representation_function)
 
     #do_op(args, tmodel)

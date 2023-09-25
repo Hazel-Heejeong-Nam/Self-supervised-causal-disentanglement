@@ -9,9 +9,7 @@ from torchvision.utils import save_image
 import random
 import copy
 from tqdm import trange
-#import mictools
 import matplotlib
-#matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from train import train
 import datetime
@@ -26,7 +24,7 @@ def main_worker(args):
     assert missing_keys == [] and unexpected_keys == []
     static = checkpoint['static']
     args.model_name = args.checkpoint.split('/')[1]
-    os.makedirs(os.path.join('results_ours2', args.model_name), exist_ok=True)
+    os.makedirs(os.path.join('results_ours', args.model_name), exist_ok=True)
 
     #################custom -> get this from label check
 
@@ -45,12 +43,12 @@ def main_worker(args):
    
     model.eval()
     dag_param = model.dag.A
-    save_DAG(dag_param, os.path.join('results_ours2', args.model_name, 'A_final'))
+    save_DAG(dag_param, os.path.join('results_ours', args.model_name, 'A_final'))
 
     sample = False
     img, gt = next(iter(train_loader))
     img, gt = img.to(args.device)[:10] , gt[:10] # 10 x 4 x 96 x 96
-    for j in [0,0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 3.5, 4,5,6,7,8,9]:
+    for j in [0,1,2,3,4]:
         fig, ax = plt.subplots(ncols=10, nrows=args.concept+1, figsize=(40,15))  
         plt.subplots_adjust(wspace=0, hspace=0)
         for i in range(args.concept):
@@ -64,7 +62,7 @@ def main_worker(args):
             ax[args.concept][k].imshow(img[k].squeeze(0).detach().cpu().permute(1,2,0))
             ax[args.concept][k].get_xaxis().set_visible(False)
             ax[args.concept][k].get_yaxis().set_visible(False)  
-        plt.savefig(os.path.join('results_ours2', args.model_name, f'do_operation_adj_{j}.png'))
+        plt.savefig(os.path.join('results_ours', args.model_name, f'do_operation_adj_{j}.png'))
 
 
 

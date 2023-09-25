@@ -37,7 +37,6 @@ def save_DAG(A, name):
     plt.savefig(f'{name}.png')
     
     
-# label에 sigmoid 해서 normalize 해둠
 def label_traverse(args, epoch, static, model, model_name, loader, pretrain, loc=-1):
     model.eval()
 

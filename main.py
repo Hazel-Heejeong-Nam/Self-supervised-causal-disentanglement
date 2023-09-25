@@ -44,27 +44,6 @@ def main_worker(args):
     save_DAG(dag_param, os.path.join(args.output_dir, args.model_name, 'A_final'))
     save_model_by_name(model,static, 'trained') # save final model
 
-
-    # # evaluation - do
-    # sample = False
-    # img, gt = next(iter(train_loader))
-    # img, gt = img.to(args.device)[:10] , gt[:10] # 10 x 4 x 96 x 96
-    # for j in range(0,5):
-    #     fig, ax = plt.subplots(ncols=10, nrows=args.concept+1, figsize=(40,15))  
-    #     plt.subplots_adjust(wspace=0, hspace=0)
-    #     for i in range(args.concept):
-    #         with torch.no_grad():
-    #             c_rec_loss, c_kl_loss, c_recon_img, mask_loss = model(img,gt, static, mask=i, sample=sample, adj=j, beta=args.c_beta, info= args.sup,stage=1, mask_loc = [0,1,2,3])
-    #         for k in range(img.size(0)):
-    #             ax[i][k].imshow(c_recon_img[k].squeeze(0).detach().cpu().permute(1,2,0))
-    #             ax[i][k].get_xaxis().set_visible(False)
-    #             ax[i][k].get_yaxis().set_visible(False)
-    #     for k in range(img.size(0)):
-    #         ax[args.concept][k].imshow(img[k].squeeze(0).detach().cpu().permute(1,2,0))
-    #         ax[args.concept][k].get_xaxis().set_visible(False)
-    #         ax[args.concept][k].get_yaxis().set_visible(False)  
-    #     plt.savefig(os.path.join(args.output_dir, args.model_name, f'do_operation_adj_{j}.png'))
-
     dag_score  = h_A(dag_param, dag_param.size()[0])
     representation_function = lambda x : model.enc_label(model.enc_share(x)[0])[0]
     mean_loss, target , key = check_label(representation_function)
@@ -109,10 +88,10 @@ def parse_args():
     parser.add_argument('--c_dag_w1', default=3, type=float)
     parser.add_argument('--c_dag_w2', default=0.5, type=float)
     # options
-    parser.add_argument('--observer', default='betavae', choices = ['betavae', 'factorvae'])
-    parser.add_argument('--lr_D', default=1e-4, type=float, help='learning rate of the discriminator')
-    parser.add_argument('--beta1_D', default=0.5, type=float, help='beta1 parameter of the Adam optimizer for the discriminator')
-    parser.add_argument('--beta2_D', default=0.9, type=float, help='beta2 parameter of the Adam optimizer for the discriminator')
+    parser.add_argument('--observer', default='betavae')
+    # parser.add_argument('--lr_D', default=1e-4, type=float, help='learning rate of the discriminator')
+    # parser.add_argument('--beta1_D', default=0.5, type=float, help='beta1 parameter of the Adam optimizer for the discriminator')
+    # parser.add_argument('--beta2_D', default=0.9, type=float, help='beta2 parameter of the Adam optimizer for the discriminator')
     parser.add_argument('--decoder_dist', default='bernoulli', choices=['bernoulli','gaussian'])
     parser.add_argument('--sup', default='unsup', help='unsup : causalVAE w/o label , selfsup : scvae, weaksup : causalVAE',choices=['unsup', 'selfsup', 'weaksup']) 
     # # evaluate
