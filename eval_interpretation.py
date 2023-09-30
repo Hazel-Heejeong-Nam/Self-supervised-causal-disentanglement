@@ -3,7 +3,7 @@ import argparse
 import torch
 from utils import save_model_by_name, h_A, DeterministicWarmup, c_dataset, reconstruction_loss, kl_divergence, save_DAG, label_traverse, save_imgsets, permute_dims
 import os
-from model import tuningfork_vae, Discriminator
+from scadi import tuningfork_vae, Discriminator
 import argparse
 from torchvision.utils import save_image
 import random

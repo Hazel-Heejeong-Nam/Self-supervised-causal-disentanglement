@@ -4,7 +4,7 @@ import torch
 from utils import save_model_by_name, h_A, c_dataset, reconstruction_loss, kl_divergence, save_DAG, save_imgsets
 from metrics import check_label
 import os
-from model import tuningfork_vae, Discriminator
+from scadi import tuningfork_vae, Discriminator
 import argparse
 from torchvision.utils import save_image
 import random

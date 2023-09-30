@@ -3,7 +3,7 @@ from metrics import check_label
 import numpy as np
 from main import parse_args
 import torch
-from model import tuningfork_vae
+from scadi import tuningfork_vae
 import os
 device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
 
