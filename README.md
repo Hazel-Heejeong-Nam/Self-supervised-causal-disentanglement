@@ -1,4 +1,4 @@
-# SCADI : Self-supervised CAusal DIsentanglement in latent variable models
+# SCADI : Self-supervised CAusal DIsentanglement in latent variable models ( NeurIPS 2023 Causal Representation Learning Workshop)
 
 <img src="https://github.com/Hazel-Heejeong-Nam/Self-supervised-causal-disentanglement/assets/100391059/93560b8b-6556-4ed9-9919-e11a6758fcb0"  width="500">
 
